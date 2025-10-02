@@ -1,2 +1,136 @@
-# blockchain-voting-api
-Solidity + TS voting solution using ETH as network
+# Blockchain Voting API
+
+Sistema de votação totalmente on-chain construído em Solidity com Hardhat, utilizando dois mecanismos clássicos de privacidade e auditabilidade:
+
+- **Commit–Reveal**: primeiro você registra um compromisso criptográfico (a "aposta" lacrada); depois, em outra fase, revela o seu voto junto com o segredo que prova ser o dono daquela aposta. Isso impede que alguém copie o voto antes da hora, como num concurso onde todos depositam envelopes em uma urna e só depois os abrem.
+- **Blind Signatures**: cada eleitor recebe uma credencial assinada pela autoridade, porém essa assinatura é emitida sem que a autoridade enxergue o conteúdo final (analogia do "papel carbono": o escrivão assina o envelope opaco, e você transfere a assinatura para a ficha escondida lá dentro). Assim garantimos que apenas eleitores autorizados participem, sem revelar quem recebeu qual credencial.
+
+O contrato `SimpleVoting.sol` combina esses dois mecanismos: apenas quem apresenta uma credencial válida consegue registrar o commit, e somente após a janela de commit é possível revelar e contabilizar o voto.
+
+## Visão Geral do Fluxo
+
+1. **Preparação (off-chain)**
+   - A autoridade emissora gera/sorteia credenciais cegas para cada eleitor e assina sem ver o conteúdo real.
+   - O eleitor guarda a sua credencial (nonce + assinatura).
+
+2. **Commit (on-chain)**
+   - Dentro da janela `startAt → commitEndAt`, o eleitor calcula um compromisso `keccak256(address, optionIndex, salt)` e envia para `commitVote`, junto com sua credencial e a assinatura.
+   - O contrato verifica a assinatura contra o endereço do emissor, marca a credencial como usada e armazena o compromisso.
+
+3. **Reveal (on-chain)**
+   - Após `commitEndAt` e antes de `endAt`, o eleitor chama `revealVote(optionIndex, salt)`.
+   - O contrato recomputa o compromisso e, se corresponder, credita um voto para a opção informada.
+
+4. **Finalização**
+   - Terminada a fase de reveal, qualquer conta pode chamar `finalize()` para emitir o evento `Finalized`, consolidando o resultado.
+
+### Metáfora resumida
+
+Imagine uma assembleia com envelopes lacrados e fichas carimbadas:
+- A secretaria distribui fichas carimbadas (blind signature) a quem tem direito a voto, mas não sabe qual ficha cada pessoa pegou.
+- Cada um coloca sua ficha com o voto num envelope e joga na urna antes de ela ser lacrada (commit).
+- Quando a urna é aberta na hora certa, cada votante prova que aquele envelope era seu revelando o número secreto, e o voto é contado (reveal).
+
+## Estrutura do Projeto
+
+```
+contracts/
+  SimpleVoting.sol     # Contrato principal com commit-reveal + credenciais blindadas
+scripts/
+  deploy.js            # Deploy manual para uma rede configurada no Hardhat
+  simulate.js          # Executa uma simulação completa (commit + reveal) e gera dados para o frontend
+frontend/
+  index.html           # Página simples que lê cache/simulate-result.json e exibe os resultados
+cache/
+  simulate-result.json # Gerado pela simulação; usado para o frontend demonstrar o processo
+```
+
+## Pré-requisitos
+
+- Node.js ≥ 18
+- npm (incluso no Node)
+- Hardhat já está listado como dependência
+
+Instale as dependências:
+
+```bash
+npm install
+```
+
+## Como Rodar
+
+### 1. Iniciar uma rede local
+
+```bash
+npm run node
+```
+
+Este comando abre um nó Hardhat com contas predefinidas. Mantenha o processo rodando em um terminal.
+
+### 2. Executar a simulação end-to-end
+
+Em outro terminal:
+
+```bash
+npm run simulate
+```
+
+O script faz o seguinte:
+- faz o deploy do contrato `SimpleVoting` com datas relativas ao tempo atual;
+- usa a primeira conta do Hardhat como autoridade emissora que assina credenciais;
+- seleciona cinco contas como eleitores, gera commits com salts aleatórios, envia os commits, avança o tempo e realiza os reveals;
+- salva o arquivo `cache/simulate-result.json` com todos os hashes, transações e metadados.
+
+Você verá no console logs para cada `commit` e `reveal`, além do resumo final da votação.
+
+### 3. Visualizar no frontend de demonstração
+
+Sirva o diretório do projeto (pode ser com qualquer servidor estático, por exemplo):
+
+```bash
+npx http-server .
+```
+
+Acesse `http://localhost:8080/frontend/index.html` (ajuste a porta/conjunto conforme o servidor escolhido). A página carrega `cache/simulate-result.json` e mostra:
+- pauta e carimbo de geração;
+- endereço da autoridade emissora;
+- horários de término da fase de commit e reveal;
+- para cada eleitor: hash do compromisso (`voteToken`), hash da credencial (`voterToken`), opção revelada e hashes das transações de commit/reveal.
+
+> Importante: sempre rode `npm run simulate` depois de iniciar o nó local para gerar um arquivo de resultados atualizado.
+
+## Deploy manual (opcional)
+
+Caso queira fazer o deploy manual em outra rede Hardhat configurada, use:
+
+```bash
+npm run deploy:local
+```
+
+Ajuste `scripts/deploy.js` ou as configurações de rede no `hardhat.config.js` conforme sua necessidade.
+
+## Detalhes Técnicos do Contrato
+
+- Guarda o dono (`owner`) e a autoridade (`issuer`) que assina as credenciais.
+- `commitVote(bytes32 commitment, bytes32 credentialNonce, bytes signature)`
+  - valida se estamos na fase correta;
+  - deriva `credentialHash = keccak256(voter, credentialNonce)` e garante que ainda não foi usado;
+  - checa a assinatura via `ECDSA.recover` + `MessageHashUtils.toEthSignedMessageHash`;
+  - salva `commitment` e o hash da credencial para auditoria.
+- `revealVote(uint8 optionIndex, bytes32 salt)`
+  - aceita apenas na janela de reveal;
+  - recomputa `keccak256(voter, optionIndex, salt)`;
+  - incrementa o contador da opção correspondente.
+- `commitmentOf` e `credentialHashOf` permitem verificar o que foi registrado para cada endereço.
+
+## Perguntas Frequentes
+
+**Por que usar blind signatures se já existe o commit–reveal?**
+> O commit–reveal impede que o voto seja lido antes da hora, mas, sozinho, ele ainda exige que o contrato saiba quem está autorizando o commit. As blind signatures permitem que a autoridade distribua credenciais sem amarrá-las publicamente a um eleitor específico, conciliando controle de acesso e privacidade.
+
+**Onde ocorre a parte "cega" da assinatura?**
+> Sempre fora da blockchain. O contrato só recebe a assinatura já descegada (o eleitor faz isso localmente) e valida com a chave pública da autoridade.
+
+**Como adapto para produção?**
+> Troque o script de simulação por fluxos reais: geração de credenciais off-chain, distribuição segura aos eleitores, interface web/mobile que prepare o commit e realize o reveal no tempo certo. Considere também adicionar mecanismos de registro extra e provas de inclusão/exclusão conforme o caso de uso.
+
