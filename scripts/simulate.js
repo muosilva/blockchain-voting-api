@@ -40,29 +40,26 @@ async function main() {
   for (const entry of plan) {
     const voter = entry.signer;
     const salt = ethers.hexlify(ethers.randomBytes(32));
+    const credentialSecret = ethers.hexlify(ethers.randomBytes(32));
+    const credentialHash = ethers.keccak256(credentialSecret);
     const commitment = ethers.solidityPackedKeccak256(
-      ["address", "uint8", "bytes32"],
-      [voter.address, entry.optionIndex, salt]
-    );
-
-    const credentialNonce = ethers.hexlify(ethers.randomBytes(32));
-    const credentialHash = ethers.solidityPackedKeccak256(
-      ["address", "bytes32"],
-      [voter.address, credentialNonce]
+      ["bytes32", "uint8", "bytes32"],
+      [credentialHash, entry.optionIndex, salt]
     );
     const signature = await issuer.signMessage(ethers.getBytes(credentialHash));
 
-    const commitTx = await c.connect(voter).commitVote(commitment, credentialNonce, signature);
+    const commitTx = await c.connect(voter).commitVote(credentialHash, commitment, signature);
     const commitReceipt = await commitTx.wait();
 
     entry.salt = salt;
     entry.commitment = commitment;
-    entry.credentialNonce = credentialNonce;
+    entry.credentialSecret = credentialSecret;
     entry.credentialHash = credentialHash;
     entry.credentialSignature = signature;
     entry.commitTx = commitReceipt.hash;
+    entry.commitCaller = voter.address;
 
-    console.log(`Commit ${voter.address} -> opção ${entry.optionIndex}`);
+    console.log(`Commit credential ${credentialHash} -> opção ${entry.optionIndex}`);
   }
 
   // desloca tempo para a janela de reveal
@@ -71,7 +68,7 @@ async function main() {
 
   for (const entry of plan) {
     const voter = entry.signer;
-    const revealTx = await c.connect(voter).revealVote(entry.optionIndex, entry.salt);
+    const revealTx = await c.connect(voter).revealVote(entry.credentialHash, entry.optionIndex, entry.salt);
     const revealReceipt = await revealTx.wait();
 
     voteRecords.push({
@@ -83,11 +80,11 @@ async function main() {
       end: endISO,
       commitTx: entry.commitTx,
       revealTx: revealReceipt.hash,
-      credentialNonce: entry.credentialNonce,
+      credentialSecret: entry.credentialSecret,
       credentialSignature: entry.credentialSignature
     });
 
-    console.log(`Reveal ${voter.address} -> opção ${entry.optionIndex}`);
+    console.log(`Reveal credential ${entry.credentialHash} -> opção ${entry.optionIndex}`);
   }
 
   const labels = await c.options();

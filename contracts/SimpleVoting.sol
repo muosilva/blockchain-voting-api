@@ -19,15 +19,15 @@ contract SimpleVoting {
     error InvalidOption();
     error InvalidReveal();
     error InvalidCredentialSignature();
-    error CredentialAlreadyUsed();
+    error InvalidCredentialHash();
     error EmptyName();
     error NeedAtLeastTwoOptions();
     error NoCommitment();
     error NotOwner();
 
     // Eventos
-    event Committed(address indexed voter, bytes32 indexed commitment, uint256 timestamp);
-    event Voted(address indexed voter, uint8 indexed option, uint256 timestamp);
+    event Committed(bytes32 indexed credentialHash, bytes32 indexed commitment, uint256 timestamp);
+    event Voted(bytes32 indexed credentialHash, uint8 indexed option, uint256 timestamp);
     event Finalized(uint256[] tally, uint256 timestamp);
 
     // Estado
@@ -39,10 +39,13 @@ contract SimpleVoting {
     uint256 public immutable commitEndAt; // fim do período de commit (unix)
     uint256 public immutable endAt;     // fim do período de reveal (unix)
     uint256[] private _tally;           // contagem por opção
-    mapping(address => bytes32) private _commitments;
-    mapping(address => bytes32) private _credentialHashes;
-    mapping(bytes32 => bool) private _credentialUsed;
-    mapping(address => bool) public hasRevealed;
+
+    struct Ballot {
+        bytes32 commitment;
+        bool revealed;
+    }
+
+    mapping(bytes32 => Ballot) private _ballots; // credential hash => voto
     bool public finalized;
 
     constructor(
@@ -73,47 +76,46 @@ contract SimpleVoting {
     modifier onlyOwner() { if (msg.sender != owner) revert NotOwner(); _; }
 
     /// @notice Registra o compromisso hashado de um voto durante a fase de commit.
-    /// @param commitment Hash calculado via `keccak256(abi.encodePacked(voter, optionIndex, salt))`.
-    /// @param credentialNonce Valor aleatório utilizado para derivar a credencial assinada cegamente.
-    /// @param signature Assinatura (ecdsA) emitida pela autoridade sobre `keccak256(voter, credentialNonce)`.
-    function commitVote(bytes32 commitment, bytes32 credentialNonce, bytes calldata signature) external {
+    /// @param credentialHash Token opaco representando o eleitor (resultado do blind signature).
+    /// @param commitment Hash calculado via `keccak256(credentialHash, optionIndex, salt)`.
+    /// @param signature Assinatura emitida pela autoridade sobre `credentialHash`.
+    function commitVote(bytes32 credentialHash, bytes32 commitment, bytes calldata signature) external {
         uint256 t = block.timestamp;
         if (t < startAt) revert CommitPhaseNotOpen();
         if (t > commitEndAt) revert CommitPhaseClosed();
-        if (_commitments[msg.sender] != bytes32(0)) revert AlreadyCommitted();
+        if (credentialHash == bytes32(0)) revert InvalidCredentialHash();
 
-        bytes32 credentialHash = keccak256(abi.encodePacked(msg.sender, credentialNonce));
-        if (_credentialUsed[credentialHash]) revert CredentialAlreadyUsed();
+        Ballot storage ballot = _ballots[credentialHash];
+        if (ballot.commitment != bytes32(0)) revert AlreadyCommitted();
 
         address recovered = ECDSA.recover(MessageHashUtils.toEthSignedMessageHash(credentialHash), signature);
         if (recovered != issuer) revert InvalidCredentialSignature();
 
-        _credentialUsed[credentialHash] = true;
-        _commitments[msg.sender] = commitment;
-        _credentialHashes[msg.sender] = credentialHash;
-        emit Committed(msg.sender, commitment, t);
+        ballot.commitment = commitment;
+        emit Committed(credentialHash, commitment, t);
     }
 
     /// @notice Revela o voto previamente comprometido, contabilizando a opção correspondente.
     /// @param optionIndex Índice da opção na qual o endereço deseja votar.
     /// @param salt Valor aleatório usado na fase de commit.
-    function revealVote(uint8 optionIndex, bytes32 salt) external {
+    /// @param credentialHash Token opaco associado ao compromisso.
+    function revealVote(bytes32 credentialHash, uint8 optionIndex, bytes32 salt) external {
         uint256 t = block.timestamp;
         if (t <= commitEndAt) revert RevealPhaseNotOpen();
         if (t > endAt) revert RevealPhaseClosed();
         if (optionIndex >= _options.length) revert InvalidOption();
 
-        bytes32 commitment = _commitments[msg.sender];
+        Ballot storage ballot = _ballots[credentialHash];
+        bytes32 commitment = ballot.commitment;
         if (commitment == bytes32(0)) revert NoCommitment();
-        if (hasRevealed[msg.sender]) revert AlreadyRevealed();
+        if (ballot.revealed) revert AlreadyRevealed();
 
-        bytes32 computed = keccak256(abi.encodePacked(msg.sender, optionIndex, salt));
+        bytes32 computed = keccak256(abi.encodePacked(credentialHash, optionIndex, salt));
         if (computed != commitment) revert InvalidReveal();
 
-        hasRevealed[msg.sender] = true;
-        _commitments[msg.sender] = bytes32(0);
+        ballot.revealed = true;
         _tally[optionIndex] += 1;
-        emit Voted(msg.sender, optionIndex, t);
+        emit Voted(credentialHash, optionIndex, t);
     }
 
     function finalize() external {
@@ -148,12 +150,9 @@ contract SimpleVoting {
         return _tally;
     }
 
-    function commitmentOf(address voter) external view returns (bytes32) {
-        return _commitments[voter];
-    }
-
-    function credentialHashOf(address voter) external view returns (bytes32) {
-        return _credentialHashes[voter];
+    function ballotOf(bytes32 credentialHash) external view returns (bytes32 commitment, bool revealed) {
+        Ballot storage ballot = _ballots[credentialHash];
+        return (ballot.commitment, ballot.revealed);
     }
 
     function totalVotes() public view returns (uint256 total) {
