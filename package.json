@@ -1,0 +1,33 @@
+{
+  "name": "blockchain-voting-api",
+  "version": "1.0.0",
+  "description": "Solidity + TS voting solution using ETH as network",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "clean": "hardhat clean",
+    "build": "hardhat compile",
+    "node": "hardhat node",
+    "deploy:local": "hardhat run scripts/deploy.js --network localhost",
+    "simulate": "hardhat run scripts/simulate.js --network localhost"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/muosilva/blockchain-voting-api.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/muosilva/blockchain-voting-api/issues"
+  },
+  "homepage": "https://github.com/muosilva/blockchain-voting-api#readme",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox-mocha-ethers": "^3.0.0",
+    "chai": "^5.3.3",
+    "dotenv": "^17.2.3",
+    "hardhat": "^3.0.6",
+    "mocha": "^11.7.4"
+  }
+}

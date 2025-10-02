@@ -1,15 +1,16 @@
-# Remix compiler artifacts
-**/artifacts/
-**/artifacts/**
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.pnpm-store/
 
-# Remix plugin state folders
-deps/
-states/
+# Hardhat
+artifacts/
+cache/
+typechain/
+coverage/
 
-# Debug info
-*.dbg.json
-*.tsbuildinfo
-
-# Optional
+# Ambiente
 .env
 .env.local
+.DS_Store
