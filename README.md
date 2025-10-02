@@ -5,7 +5,7 @@ Sistema de votação totalmente on-chain construído em Solidity com Hardhat, ut
 - **Commit–Reveal**: primeiro você registra um compromisso criptográfico (a "aposta" lacrada); depois, em outra fase, revela o seu voto junto com o segredo que prova ser o dono daquela aposta. Isso impede que alguém copie o voto antes da hora, como num concurso onde todos depositam envelopes em uma urna e só depois os abrem.
 - **Blind Signatures**: cada eleitor recebe uma credencial assinada pela autoridade, porém essa assinatura é emitida sem que a autoridade enxergue o conteúdo final (analogia do "papel carbono": o escrivão assina o envelope opaco, e você transfere a assinatura para a ficha escondida lá dentro). Assim garantimos que apenas eleitores autorizados participem, sem revelar quem recebeu qual credencial.
 
-O contrato `SimpleVoting.sol` combina esses dois mecanismos: apenas quem apresenta uma credencial válida consegue registrar o commit, e somente após a janela de commit é possível revelar e contabilizar o voto.
+O contrato `SimpleVoting.sol` combina esses dois mecanismos: apenas quem apresenta uma credencial válida consegue registrar o commit, e somente após a janela de commit é possível revelar e contabilizar o voto. Nenhuma parte do processo liga o voto diretamente a um endereço Ethereum; tudo gira em torno de um token opaco derivado da credencial.
 
 ## Visão Geral do Fluxo
 
@@ -14,12 +14,12 @@ O contrato `SimpleVoting.sol` combina esses dois mecanismos: apenas quem apresen
    - O eleitor guarda a sua credencial (nonce + assinatura).
 
 2. **Commit (on-chain)**
-   - Dentro da janela `startAt → commitEndAt`, o eleitor calcula um compromisso `keccak256(address, optionIndex, salt)` e envia para `commitVote`, junto com sua credencial e a assinatura.
-   - O contrato verifica a assinatura contra o endereço do emissor, marca a credencial como usada e armazena o compromisso.
+   - Dentro da janela `startAt → commitEndAt`, o eleitor calcula um compromisso `keccak256(credentialHash, optionIndex, salt)` e envia para `commitVote`, junto com a credencial e a assinatura da autoridade.
+   - O contrato verifica a assinatura contra o endereço do emissor, garante que aquela credencial ainda não foi usada e guarda apenas o compromisso.
 
 3. **Reveal (on-chain)**
-   - Após `commitEndAt` e antes de `endAt`, o eleitor chama `revealVote(optionIndex, salt)`.
-   - O contrato recomputa o compromisso e, se corresponder, credita um voto para a opção informada.
+   - Após `commitEndAt` e antes de `endAt`, o eleitor chama `revealVote(credentialHash, optionIndex, salt)`.
+   - O contrato recomputa o compromisso com base no token da credencial e, se corresponder, credita um voto para a opção informada.
 
 4. **Finalização**
    - Terminada a fase de reveal, qualquer conta pode chamar `finalize()` para emitir o evento `Finalized`, consolidando o resultado.
@@ -28,8 +28,8 @@ O contrato `SimpleVoting.sol` combina esses dois mecanismos: apenas quem apresen
 
 Imagine uma assembleia com envelopes lacrados e fichas carimbadas:
 - A secretaria distribui fichas carimbadas (blind signature) a quem tem direito a voto, mas não sabe qual ficha cada pessoa pegou.
-- Cada um coloca sua ficha com o voto num envelope e joga na urna antes de ela ser lacrada (commit).
-- Quando a urna é aberta na hora certa, cada votante prova que aquele envelope era seu revelando o número secreto, e o voto é contado (reveal).
+- Cada um escreve um código secreto na ficha, coloca num envelope e joga na urna antes de ela ser lacrada (commit).
+- Quando a urna é aberta na hora certa, o eleitor mostra apenas o código secreto — não o nome — e o envelope correspondente é identificado e contado (reveal).
 
 ## Estrutura do Projeto
 
@@ -112,16 +112,15 @@ Ajuste `scripts/deploy.js` ou as configurações de rede no `hardhat.config.js` 
 ## Detalhes Técnicos do Contrato
 
 - Guarda o dono (`owner`) e a autoridade (`issuer`) que assina as credenciais.
-- `commitVote(bytes32 commitment, bytes32 credentialNonce, bytes signature)`
-  - valida se estamos na fase correta;
-  - deriva `credentialHash = keccak256(voter, credentialNonce)` e garante que ainda não foi usado;
-  - checa a assinatura via `ECDSA.recover` + `MessageHashUtils.toEthSignedMessageHash`;
-  - salva `commitment` e o hash da credencial para auditoria.
-- `revealVote(uint8 optionIndex, bytes32 salt)`
+- `commitVote(bytes32 credentialHash, bytes32 commitment, bytes signature)`
+  - valida fase e formato do token;
+  - verifica a assinatura da autoridade sobre `credentialHash`;
+  - armazena o compromisso associado ao token opaco.
+- `revealVote(bytes32 credentialHash, uint8 optionIndex, bytes32 salt)`
   - aceita apenas na janela de reveal;
-  - recomputa `keccak256(voter, optionIndex, salt)`;
-  - incrementa o contador da opção correspondente.
-- `commitmentOf` e `credentialHashOf` permitem verificar o que foi registrado para cada endereço.
+  - recomputa `keccak256(credentialHash, optionIndex, salt)` para conferir o compromisso;
+  - incrementa o contador sem revelar nenhum endereço.
+- `ballotOf(bytes32 credentialHash)` retorna o compromisso e se ele já foi revelado, auxiliando auditorias.
 
 ## Perguntas Frequentes
 
@@ -133,4 +132,3 @@ Ajuste `scripts/deploy.js` ou as configurações de rede no `hardhat.config.js` 
 
 **Como adapto para produção?**
 > Troque o script de simulação por fluxos reais: geração de credenciais off-chain, distribuição segura aos eleitores, interface web/mobile que prepare o commit e realize o reveal no tempo certo. Considere também adicionar mecanismos de registro extra e provas de inclusão/exclusão conforme o caso de uso.
-
