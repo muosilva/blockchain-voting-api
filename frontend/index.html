@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <title>Resultado da Votação - Simulação</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 2rem; background: #f7f7f7; color: #222; }
+      main { background: #fff; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+      h1 { margin-top: 0; }
+      .result-line { font-family: monospace; margin: 0.5rem 0; padding: 0.5rem; background: #f0f0f0; border-radius: 4px; word-break: break-all; }
+      .error { color: #b3261e; }
+      .meta { font-size: 0.9rem; color: #555; margin-bottom: 1rem; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Resultado da Simulação</h1>
+      <p id="status" class="meta">Carregando dados...</p>
+      <div id="results"></div>
+    </main>
+
+    <script type="module">
+      const statusEl = document.querySelector('#status');
+      const resultsEl = document.querySelector('#results');
+
+      async function loadSimulation() {
+        try {
+          const response = await fetch('/cache/simulate-result.json', { cache: 'no-store' });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const data = await response.json();
+
+          if (!Array.isArray(data.votes) || data.votes.length === 0) {
+            statusEl.textContent = 'Nenhum voto encontrado. Execute `npm run simulate` após iniciar o nó local.';
+            return;
+          }
+
+          const header = `Última simulação gerada em ${new Date(data.generatedAt).toLocaleString('pt-BR')} para a pauta "${data.pauta}"`;
+          statusEl.textContent = header;
+
+          data.votes.forEach((vote) => {
+            const line = document.createElement('div');
+            line.className = 'result-line';
+            line.textContent = `${vote.pauta} | ${vote.voteToken} | ${vote.voterToken} | ${vote.voto} | ${vote.start} | ${vote.end}`;
+            resultsEl.appendChild(line);
+          });
+        } catch (error) {
+          statusEl.textContent = 'Erro ao carregar dados da simulação. Confirme se o arquivo cache/simulate-result.json existe.';
+          statusEl.classList.add('error');
+          console.error(error);
+        }
+      }
+
+      loadSimulation();
+    </script>
+  </body>
+</html>
