@@ -88,7 +88,8 @@ contract SimpleVoting {
         Ballot storage ballot = _ballots[credentialHash];
         if (ballot.commitment != bytes32(0)) revert AlreadyCommitted();
 
-        address recovered = ECDSA.recover(MessageHashUtils.toEthSignedMessageHash(credentialHash), signature);
+        bytes32 digest = _credentialSignDigest(credentialHash);
+        address recovered = ECDSA.recover(digest, signature);
         if (recovered != issuer) revert InvalidCredentialSignature();
 
         ballot.commitment = commitment;
@@ -124,6 +125,20 @@ contract SimpleVoting {
             finalized = true;
             emit Finalized(_tally, block.timestamp);
         }
+    }
+
+    // ======== Helpers de segurança / domínio ========
+
+    function _credentialSignDigest(bytes32 credentialHash) internal view returns (bytes32) {
+        bytes32 msgHash = keccak256(
+            abi.encodePacked(
+                "SimpleVoting:",
+                address(this),
+                block.chainid,
+                credentialHash
+            )
+        );
+        return MessageHashUtils.toEthSignedMessageHash(msgHash);
     }
 
     // VIEWS
