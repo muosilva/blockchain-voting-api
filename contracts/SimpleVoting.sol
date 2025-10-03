@@ -26,8 +26,8 @@ contract SimpleVoting {
     error NotOwner();
 
     // Eventos
-    event Committed(bytes32 indexed credentialHash, bytes32 indexed commitment, uint256 timestamp);
-    event Voted(bytes32 indexed credentialHash, uint8 indexed option, uint256 timestamp);
+    event Committed(bytes32 indexed commitment, uint256 timestamp);
+    event Voted(uint8 indexed option, uint256 timestamp);
     event Finalized(uint256[] tally, uint256 timestamp);
 
     // Estado
@@ -93,7 +93,7 @@ contract SimpleVoting {
         if (recovered != issuer) revert InvalidCredentialSignature();
 
         ballot.commitment = commitment;
-        emit Committed(credentialHash, commitment, t);
+        emit Committed(commitment, t);
     }
 
     /// @notice Revela o voto previamente comprometido, contabilizando a opção correspondente.
@@ -116,7 +116,7 @@ contract SimpleVoting {
 
         ballot.revealed = true;
         _tally[optionIndex] += 1;
-        emit Voted(credentialHash, optionIndex, t);
+        emit Voted(optionIndex, t);
     }
 
     function finalize() external {
