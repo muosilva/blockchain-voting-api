@@ -132,15 +132,8 @@ contract SimpleVoting {
 
     // ======== Helpers ========
 
-    function _credentialSignDigest(bytes32 credentialHash) internal view returns (bytes32) {
-        bytes32 msgHash = keccak256(
-            abi.encodePacked(
-                "SimpleVoting:",
-                address(this),
-                block.chainid,
-                credentialHash
-            )
-        );
+    function _credentialSignDigest(bytes32 credentialHash) internal pure returns (bytes32) {
+        bytes32 msgHash = keccak256(abi.encodePacked("SimpleVoting:", credentialHash));
         return MessageHashUtils.toEthSignedMessageHash(msgHash);
     }
 

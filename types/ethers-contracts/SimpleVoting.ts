@@ -6,7 +6,7 @@ import type { TypedContractEvent, TypedDeferredTopicFilter, TypedEventLog, Typed
   
 
   export interface SimpleVotingInterface extends Interface {
-    getFunction(nameOrSignature: "addOption" | "ballotOf" | "commitEndAt" | "commitVote" | "endAt" | "finalize" | "finalized" | "isCommitPhase" | "isOpen" | "isRevealPhase" | "issuer" | "leadingOption" | "name" | "options" | "owner" | "revealVote" | "setName" | "startAt" | "tally" | "totalVotes"): FunctionFragment;
+    getFunction(nameOrSignature: "addOption" | "ballotOf" | "commitEndAt" | "commitVote" | "currentPhase" | "endAt" | "finalize" | "finalized" | "isCommitPhase" | "isOpen" | "isRevealPhase" | "issuer" | "leadingOption" | "name" | "options" | "owner" | "revealVote" | "setName" | "startAt" | "tally" | "totalVotes"): FunctionFragment;
 
     getEvent(nameOrSignatureOrTopic: "Committed" | "Finalized" | "Voted"): EventFragment;
 
@@ -14,6 +14,7 @@ import type { TypedContractEvent, TypedDeferredTopicFilter, TypedEventLog, Typed
 encodeFunctionData(functionFragment: 'ballotOf', values: [BytesLike]): string;
 encodeFunctionData(functionFragment: 'commitEndAt', values?: undefined): string;
 encodeFunctionData(functionFragment: 'commitVote', values: [BytesLike, BytesLike, BytesLike]): string;
+encodeFunctionData(functionFragment: 'currentPhase', values?: undefined): string;
 encodeFunctionData(functionFragment: 'endAt', values?: undefined): string;
 encodeFunctionData(functionFragment: 'finalize', values?: undefined): string;
 encodeFunctionData(functionFragment: 'finalized', values?: undefined): string;
@@ -35,6 +36,7 @@ encodeFunctionData(functionFragment: 'totalVotes', values?: undefined): string;
 decodeFunctionResult(functionFragment: 'ballotOf', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'commitEndAt', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'commitVote', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'currentPhase', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'endAt', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'finalize', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'finalized', data: BytesLike): Result;
@@ -55,9 +57,9 @@ decodeFunctionResult(functionFragment: 'totalVotes', data: BytesLike): Result;
 
   
     export namespace CommittedEvent {
-      export type InputTuple = [credentialHash: BytesLike, commitment: BytesLike, timestamp: BigNumberish];
-      export type OutputTuple = [credentialHash: string, commitment: string, timestamp: bigint];
-      export interface OutputObject {credentialHash: string, commitment: string, timestamp: bigint };
+      export type InputTuple = [commitment: BytesLike, timestamp: BigNumberish];
+      export type OutputTuple = [commitment: string, timestamp: bigint];
+      export interface OutputObject {commitment: string, timestamp: bigint };
       export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
       export type Filter = TypedDeferredTopicFilter<Event>
       export type Log = TypedEventLog<Event>
@@ -79,9 +81,9 @@ decodeFunctionResult(functionFragment: 'totalVotes', data: BytesLike): Result;
   
 
     export namespace VotedEvent {
-      export type InputTuple = [credentialHash: BytesLike, option: BigNumberish, timestamp: BigNumberish];
-      export type OutputTuple = [credentialHash: string, option: bigint, timestamp: bigint];
-      export interface OutputObject {credentialHash: string, option: bigint, timestamp: bigint };
+      export type InputTuple = [option: BigNumberish, timestamp: BigNumberish];
+      export type OutputTuple = [option: bigint, timestamp: bigint];
+      export interface OutputObject {option: bigint, timestamp: bigint };
       export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
       export type Filter = TypedDeferredTopicFilter<Event>
       export type Log = TypedEventLog<Event>
@@ -152,6 +154,14 @@ decodeFunctionResult(functionFragment: 'totalVotes', data: BytesLike): Result;
       [credentialHash: BytesLike, commitment: BytesLike, signature: BytesLike, ],
       [void],
       'nonpayable'
+    >
+    
+
+    
+    currentPhase: TypedContractMethod<
+      [],
+      [bigint],
+      'view'
     >
     
 
@@ -306,6 +316,11 @@ getFunction(nameOrSignature: 'commitVote'): TypedContractMethod<
       [void],
       'nonpayable'
     >;
+getFunction(nameOrSignature: 'currentPhase'): TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >;
 getFunction(nameOrSignature: 'endAt'): TypedContractMethod<
       [],
       [bigint],
@@ -393,7 +408,7 @@ getEvent(key: 'Voted'): TypedContractEvent<VotedEvent.InputTuple, VotedEvent.Out
 
     filters: {
       
-      'Committed(bytes32,bytes32,uint256)': TypedContractEvent<CommittedEvent.InputTuple, CommittedEvent.OutputTuple, CommittedEvent.OutputObject>;
+      'Committed(bytes32,uint256)': TypedContractEvent<CommittedEvent.InputTuple, CommittedEvent.OutputTuple, CommittedEvent.OutputObject>;
       Committed: TypedContractEvent<CommittedEvent.InputTuple, CommittedEvent.OutputTuple, CommittedEvent.OutputObject>;
     
 
@@ -401,7 +416,7 @@ getEvent(key: 'Voted'): TypedContractEvent<VotedEvent.InputTuple, VotedEvent.Out
       Finalized: TypedContractEvent<FinalizedEvent.InputTuple, FinalizedEvent.OutputTuple, FinalizedEvent.OutputObject>;
     
 
-      'Voted(bytes32,uint8,uint256)': TypedContractEvent<VotedEvent.InputTuple, VotedEvent.OutputTuple, VotedEvent.OutputObject>;
+      'Voted(uint8,uint256)': TypedContractEvent<VotedEvent.InputTuple, VotedEvent.OutputTuple, VotedEvent.OutputObject>;
       Voted: TypedContractEvent<VotedEvent.InputTuple, VotedEvent.OutputTuple, VotedEvent.OutputObject>;
     
     };

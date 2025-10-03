@@ -4,16 +4,15 @@ import path from "node:path";
 
 async function main() {
   const { ethers, provider } = await network.connect();
-
   const [issuer, ...accounts] = await ethers.getSigners();
   const voters = accounts.slice(0, 5);
 
   const name = "Condominio";
   const options = ["A", "B"];
   const now = Math.floor(Date.now() / 1000);
-  const startAt = now + 5;        // breve delay até abrir commit
+  const startAt = now + 5; // breve delay ate abrir commit
   const commitEndAt = startAt + 60; // commit dura 1 min
-  const endAt = commitEndAt + 60;   // reveal dura 1 min
+  const endAt = commitEndAt + 60; // reveal dura 1 min
   const startISO = new Date(startAt * 1000).toISOString();
   const commitEndISO = new Date(commitEndAt * 1000).toISOString();
   const endISO = new Date(endAt * 1000).toISOString();
@@ -33,7 +32,7 @@ async function main() {
 
   const voteRecords = [];
 
-  // avança para dentro da janela de commit
+  // Avanca para dentro da janela de commit
   await provider.send("evm_setNextBlockTimestamp", [startAt + 1]);
   await provider.send("evm_mine", []);
 
@@ -46,7 +45,11 @@ async function main() {
       ["bytes32", "uint8", "bytes32"],
       [credentialHash, entry.optionIndex, salt]
     );
-    const signature = await issuer.signMessage(ethers.getBytes(credentialHash));
+    const msgHash = ethers.solidityPackedKeccak256(
+      ["string", "bytes32"],
+      ["SimpleVoting:", credentialHash]
+    );
+    const signature = await issuer.signMessage(ethers.getBytes(msgHash));
 
     const commitTx = await c.connect(voter).commitVote(credentialHash, commitment, signature);
     const commitReceipt = await commitTx.wait();
@@ -59,10 +62,10 @@ async function main() {
     entry.commitTx = commitReceipt.hash;
     entry.commitCaller = voter.address;
 
-    console.log(`Commit credential ${credentialHash} -> opção ${entry.optionIndex}`);
+    console.log(`Commit credential ${credentialHash} -> opcao ${entry.optionIndex}`);
   }
 
-  // desloca tempo para a janela de reveal
+  // Desloca tempo para a janela de reveal
   await provider.send("evm_setNextBlockTimestamp", [commitEndAt + 1]);
   await provider.send("evm_mine", []);
 
@@ -84,7 +87,7 @@ async function main() {
       credentialSignature: entry.credentialSignature
     });
 
-    console.log(`Reveal credential ${entry.credentialHash} -> opção ${entry.optionIndex}`);
+    console.log(`Reveal credential ${entry.credentialHash} -> opcao ${entry.optionIndex}`);
   }
 
   const labels = await c.options();
