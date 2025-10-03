@@ -24,6 +24,7 @@ contract SimpleVoting {
     error NeedAtLeastTwoOptions();
     error NoCommitment();
     error NotOwner();
+    error ZeroCommitment();
 
     // Eventos
     event Committed(bytes32 indexed commitment, uint256 timestamp);
@@ -84,6 +85,7 @@ contract SimpleVoting {
         if (t < startAt) revert CommitPhaseNotOpen();
         if (t > commitEndAt) revert CommitPhaseClosed();
         if (credentialHash == bytes32(0)) revert InvalidCredentialHash();
+        if (commitment == bytes32(0)) revert ZeroCommitment();
 
         Ballot storage ballot = _ballots[credentialHash];
         if (ballot.commitment != bytes32(0)) revert AlreadyCommitted();
@@ -127,7 +129,7 @@ contract SimpleVoting {
         }
     }
 
-    // ======== Helpers de segurança / domínio ========
+    // ======== Helpers ========
 
     function _credentialSignDigest(bytes32 credentialHash) internal view returns (bytes32) {
         bytes32 msgHash = keccak256(
