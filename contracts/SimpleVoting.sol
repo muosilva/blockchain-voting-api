@@ -4,8 +4,8 @@ pragma solidity ^0.8.28;
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
-/// @title Votação Commit-Reveal On-chain
-/// @notice Uma pauta por contrato. Cada endereço registra um compromisso e revela
+/// @title Vota??uo Commit-Reveal On-chain
+/// @notice Uma pauta por contrato. Cada endere??o registra um compromisso e revela
 ///         o voto posteriormente dentro da janela definida.
 contract SimpleVoting {
     // Erros
@@ -25,6 +25,11 @@ contract SimpleVoting {
     error NoCommitment();
     error NotOwner();
     error ZeroCommitment();
+    error InvalidSchedule();
+    error InvalidIssuer();
+    error AlreadyStarted();
+    error EmptyOptionLabel();
+    error AlreadyFinalized();
 
     // Eventos
     event Committed(bytes32 indexed commitment, uint256 timestamp);
@@ -35,11 +40,13 @@ contract SimpleVoting {
     address public immutable owner;
     address public immutable issuer;          // autoridade que assina as credenciais
     string public name;                 // nome da pauta
-    string[] private _options;          // rótulos das opções
-    uint256 public immutable startAt;   // início do período de commit (unix)
-    uint256 public immutable commitEndAt; // fim do período de commit (unix)
-    uint256 public immutable endAt;     // fim do período de reveal (unix)
-    uint256[] private _tally;           // contagem por opção
+    string[] private _options;          // r??tulos das op????es
+    uint256 public immutable startAt;   // in??cio do per??odo de commit (unix)
+    uint256 public immutable commitEndAt; // fim do per??odo de commit (unix)
+    uint256 public immutable endAt;     // fim do per??odo de reveal (unix)
+    uint256[] private _tally;           // contagem por op??uo
+
+    enum Phase { NotStarted, Commit, Reveal, Ended }
 
     struct Ballot {
         bytes32 commitment;
@@ -59,10 +66,8 @@ contract SimpleVoting {
     ) {
         if (bytes(_name).length == 0) revert EmptyName();
         if (optionLabels.length < 2) revert NeedAtLeastTwoOptions();
-        require(_startAt > 0, "bad start");
-        require(_commitEndAt > _startAt, "bad commit window");
-        require(_endAt > _commitEndAt, "bad reveal window");
-        require(_issuer != address(0), "issuer");
+        if (_startAt == 0 || _commitEndAt <= _startAt || _endAt <= _commitEndAt) revert InvalidSchedule();
+        if (_issuer == address(0)) revert InvalidIssuer();
 
         owner = msg.sender;
         issuer = _issuer;
@@ -81,9 +86,7 @@ contract SimpleVoting {
     /// @param commitment Hash calculado via `keccak256(credentialHash, optionIndex, salt)`.
     /// @param signature Assinatura emitida pela autoridade sobre `credentialHash`.
     function commitVote(bytes32 credentialHash, bytes32 commitment, bytes calldata signature) external {
-        uint256 t = block.timestamp;
-        if (t < startAt) revert CommitPhaseNotOpen();
-        if (t > commitEndAt) revert CommitPhaseClosed();
+        uint256 t = _enforceCommitPhase();
         if (credentialHash == bytes32(0)) revert InvalidCredentialHash();
         if (commitment == bytes32(0)) revert ZeroCommitment();
 
@@ -98,14 +101,12 @@ contract SimpleVoting {
         emit Committed(commitment, t);
     }
 
-    /// @notice Revela o voto previamente comprometido, contabilizando a opção correspondente.
-    /// @param optionIndex Índice da opção na qual o endereço deseja votar.
-    /// @param salt Valor aleatório usado na fase de commit.
+    /// @notice Revela o voto previamente comprometido, contabilizando a op??uo correspondente.
+    /// @param optionIndex ??ndice da op??uo na qual o endere??o deseja votar.
+    /// @param salt Valor aleat??rio usado na fase de commit.
     /// @param credentialHash Token opaco associado ao compromisso.
     function revealVote(bytes32 credentialHash, uint8 optionIndex, bytes32 salt) external {
-        uint256 t = block.timestamp;
-        if (t <= commitEndAt) revert RevealPhaseNotOpen();
-        if (t > endAt) revert RevealPhaseClosed();
+        uint256 t = _enforceRevealPhase();
         if (optionIndex >= _options.length) revert InvalidOption();
 
         Ballot storage ballot = _ballots[credentialHash];
@@ -123,10 +124,10 @@ contract SimpleVoting {
 
     function finalize() external {
         if (block.timestamp <= endAt) revert RevealPhaseOngoing();
-        if (!finalized) {
-            finalized = true;
-            emit Finalized(_tally, block.timestamp);
-        }
+        if (finalized) revert AlreadyFinalized();
+
+        finalized = true;
+        emit Finalized(_tally, block.timestamp);
     }
 
     // ======== Helpers ========
@@ -143,20 +144,42 @@ contract SimpleVoting {
         return MessageHashUtils.toEthSignedMessageHash(msgHash);
     }
 
+    function _enforceCommitPhase() private view returns (uint256 t) {
+        t = block.timestamp;
+        if (t < startAt) revert CommitPhaseNotOpen();
+        if (t > commitEndAt) revert CommitPhaseClosed();
+    }
+
+    function _enforceRevealPhase() private view returns (uint256 t) {
+        t = block.timestamp;
+        if (t <= commitEndAt) revert RevealPhaseNotOpen();
+        if (t > endAt) revert RevealPhaseClosed();
+    }
+
+    function _enforceBeforeStart() private view {
+        if (block.timestamp >= startAt) revert AlreadyStarted();
+    }
+
     // VIEWS
-    function isOpen() public view returns (bool) {
+    function currentPhase() public view returns (Phase) {
         uint256 t = block.timestamp;
-        return t >= startAt && t <= endAt;
+        if (t < startAt) return Phase.NotStarted;
+        if (t <= commitEndAt) return Phase.Commit;
+        if (t <= endAt) return Phase.Reveal;
+        return Phase.Ended;
+    }
+
+    function isOpen() public view returns (bool) {
+        Phase phase = currentPhase();
+        return phase == Phase.Commit || phase == Phase.Reveal;
     }
 
     function isCommitPhase() public view returns (bool) {
-        uint256 t = block.timestamp;
-        return t >= startAt && t <= commitEndAt;
+        return currentPhase() == Phase.Commit;
     }
 
     function isRevealPhase() public view returns (bool) {
-        uint256 t = block.timestamp;
-        return t > commitEndAt && t <= endAt;
+        return currentPhase() == Phase.Reveal;
     }
 
     function options() external view returns (string[] memory) {
@@ -186,15 +209,16 @@ contract SimpleVoting {
         return (maxIndex, maxCount, hasTie);
     }
 
-    // Admin (opcional): apenas antes do início
+    // Admin (opcional): apenas antes do in??cio
     function setName(string calldata newName) external onlyOwner {
-        require(block.timestamp < startAt, "started");
+        _enforceBeforeStart();
         if (bytes(newName).length == 0) revert EmptyName();
         name = newName;
     }
 
     function addOption(string calldata label) external onlyOwner {
-        require(block.timestamp < startAt, "started");
+        _enforceBeforeStart();
+        if (bytes(label).length == 0) revert EmptyOptionLabel();
         _options.push(label);
         _tally.push(0);
     }
