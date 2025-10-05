@@ -1,4 +1,4 @@
-import { network } from "hardhat";
+﻿import { network } from "hardhat";
 
 async function main() {
   const { ethers } = await network.connect();
@@ -8,25 +8,34 @@ async function main() {
   const name = "Condominio";
   const options = ["A", "B"];
   const now = Math.floor(Date.now() / 1000);
-  const startAt = now + 30;        // abre commit em 30s
-  const commitEndAt = startAt + 600; // commit dura 10 min
-  const endAt   = commitEndAt + 600; // reveal dura 10 min
+  const startAt = now + 30;
+  const commitEndAt = startAt + 600;
+  const endAt = commitEndAt + 600;
 
-  const F = await ethers.getContractFactory("SimpleVoting");
-  const c = await F.deploy(name, options, startAt, commitEndAt, endAt, issuer.address);
-  await c.waitForDeployment();
+  const factory = await ethers.getContractFactory("SimpleVoting");
+  const contract = await factory.deploy(name, options, startAt, commitEndAt, endAt, issuer.address);
+  await contract.waitForDeployment();
 
-  const addr = await c.getAddress();
-  console.log("SimpleVoting deployed at:", addr);
+  const address = await contract.getAddress();
+  const metadata = await contract.metadata();
+  const [labels] = await contract.optionDetails();
 
-  // leitura básica
-  console.log("Pauta:", await c.name());
-  console.log("Opções:", await c.options());
-  console.log("Commit até:", commitEndAt);
-  console.log("Janelas:", { startAt, commitEndAt, endAt });
-  console.log("Commit aberto?", await c.isCommitPhase());
-  console.log("Reveal aberto?", await c.isRevealPhase());
-  console.log("Autoridade emissora:", issuer.address);
+  console.log("SimpleVoting deployed at:", address);
+  console.log("Version:", Number(await contract.VERSION()));
+  console.log("Metadata:", {
+    name: metadata.name,
+    issuer: metadata.issuer,
+    owner: metadata.owner,
+    startAt: Number(metadata.startAt),
+    commitEndAt: Number(metadata.commitEndAt),
+    endAt: Number(metadata.endAt),
+    currentPhase: Number(metadata.phase),
+    finalized: metadata.finalized,
+    optionCount: Number(metadata.optionCount)
+  });
+  console.log("Options:", labels);
+  console.log("Commit window open?", await contract.isCommitPhase());
+  console.log("Reveal window open?", await contract.isRevealPhase());
 }
 
 main().catch((error) => {

@@ -2,7 +2,7 @@
 
 Sistema de votação totalmente on-chain construído em Solidity com Hardhat, utilizando dois mecanismos clássicos de privacidade e auditabilidade:
 
-- **Commit–Reveal**: primeiro você registra um compromisso criptográfico (a "aposta" lacrada); depois, em outra fase, revela o seu voto junto com o segredo que prova ser o dono daquela aposta. Isso impede que alguém copie o voto antes da hora, como num concurso onde todos depositam envelopes em uma urna e só depois os abrem.
+- **Commit–Reveal**: primeiro você registra um compromisso criptográfico e associa ele ao seu voto; depois, em outra fase, revela o seu voto junto com o segredo que prova ser o dono daquela compromisso. Isso impede que alguém copie o voto antes da hora, como num concurso onde todos depositam envelopes em uma urna e só depois os abrem.
 - **Blind Signatures**: cada eleitor recebe uma credencial assinada pela autoridade, porém essa assinatura é emitida sem que a autoridade enxergue o conteúdo final (analogia do "papel carbono": o escrivão assina o envelope opaco, e você transfere a assinatura para a ficha escondida lá dentro). Assim garantimos que apenas eleitores autorizados participem, sem revelar quem recebeu qual credencial.
 
 O contrato `SimpleVoting.sol` combina esses dois mecanismos: apenas quem apresenta uma credencial válida consegue registrar o commit, e somente após a janela de commit é possível revelar e contabilizar o voto. Nenhuma parte do processo liga o voto diretamente a um endereço Ethereum; tudo gira em torno de um token opaco derivado da credencial.
@@ -27,6 +27,7 @@ O contrato `SimpleVoting.sol` combina esses dois mecanismos: apenas quem apresen
 ### Metáfora resumida
 
 Imagine uma assembleia com envelopes lacrados e fichas carimbadas:
+
 - A secretaria distribui fichas carimbadas (blind signature) a quem tem direito a voto, mas não sabe qual ficha cada pessoa pegou.
 - Cada um escreve um código secreto na ficha, coloca num envelope e joga na urna antes de ela ser lacrada (commit).
 - Quando a urna é aberta na hora certa, o eleitor mostra apenas o código secreto — não o nome — e o envelope correspondente é identificado e contado (reveal).
@@ -76,6 +77,7 @@ npm run simulate
 ```
 
 O script faz o seguinte:
+
 - faz o deploy do contrato `SimpleVoting` com datas relativas ao tempo atual;
 - usa a primeira conta do Hardhat como autoridade emissora que assina credenciais;
 - seleciona cinco contas como eleitores, gera commits com salts aleatórios, envia os commits, avança o tempo e realiza os reveals;
@@ -92,6 +94,7 @@ npx http-server .
 ```
 
 Acesse `http://localhost:8080/frontend/index.html` (ajuste a porta/conjunto conforme o servidor escolhido). A página carrega `cache/simulate-result.json` e mostra:
+
 - pauta e carimbo de geração;
 - endereço da autoridade emissora;
 - horários de término da fase de commit e reveal;
@@ -125,10 +128,13 @@ Ajuste `scripts/deploy.js` ou as configurações de rede no `hardhat.config.js` 
 ## Perguntas Frequentes
 
 **Por que usar blind signatures se já existe o commit–reveal?**
+
 > O commit–reveal impede que o voto seja lido antes da hora, mas, sozinho, ele ainda exige que o contrato saiba quem está autorizando o commit. As blind signatures permitem que a autoridade distribua credenciais sem amarrá-las publicamente a um eleitor específico, conciliando controle de acesso e privacidade.
 
 **Onde ocorre a parte "cega" da assinatura?**
+
 > Sempre fora da blockchain. O contrato só recebe a assinatura já descegada (o eleitor faz isso localmente) e valida com a chave pública da autoridade.
 
 **Como adapto para produção?**
+
 > Troque o script de simulação por fluxos reais: geração de credenciais off-chain, distribuição segura aos eleitores, interface web/mobile que prepare o commit e realize o reveal no tempo certo. Considere também adicionar mecanismos de registro extra e provas de inclusão/exclusão conforme o caso de uso.
