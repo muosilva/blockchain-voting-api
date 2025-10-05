@@ -1,6 +1,8 @@
 import { network } from "hardhat";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 
 async function main() {
   const { ethers, provider } = await network.connect();
