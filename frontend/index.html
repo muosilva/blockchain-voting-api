@@ -1,57 +1,567 @@
 <!doctype html>
 <html lang="pt-BR">
   <head>
-    <meta charset="utf-8">
-    <title>Resultado da Votação - Simulação</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Votações — Visualizador</title>
+    <meta name="color-scheme" content="dark light">
     <style>
-      body { font-family: system-ui, sans-serif; margin: 2rem; background: #f7f7f7; color: #222; }
-      main { background: #fff; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-      h1 { margin-top: 0; }
-      .result-line { font-family: monospace; margin: 0.5rem 0; padding: 0.5rem; background: #f0f0f0; border-radius: 4px; word-break: break-all; }
-      .error { color: #b3261e; }
-      .meta { font-size: 0.9rem; color: #555; margin-bottom: 1rem; }
+      :root{
+        --bg: #0b0f14;
+        --panel: #121922;
+        --muted: #97a3b6;
+        --text: #e6eefc;
+        --green: #3ddc97;
+        --yellow: #ffd166;
+        --red: #ff6b6b;
+        --blue: #76a9fa;
+        --purple: #b794f4;
+        --badge: #1f2a37;
+        --card: #0f1620;
+        --shadow: 0 8px 24px rgba(0,0,0,.35);
+        --border: #1f2a37;
+        --input: #0c131d;
+        --focus: #2a4365;
+      }
+      *{ box-sizing: border-box }
+      html, body{ height:100% }
+      body{
+        margin:0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+        background:
+          radial-gradient(1200px 600px at 10% -10%, rgba(118,169,250,.06), transparent),
+          radial-gradient(1000px 500px at 110% 10%, rgba(185,148,255,.06), transparent),
+          var(--bg);
+        color: var(--text);
+        overflow-x: hidden; /* nunca ultrapassar viewport */
+      }
+      :focus-visible{
+        outline: 2px solid var(--focus);
+        outline-offset: 2px;
+        border-radius: 8px;
+      }
+      header{
+        position: sticky; top:0; z-index: 10;
+        backdrop-filter: blur(8px);
+        background: linear-gradient(180deg, rgba(15,22,32,.9), rgba(15,22,32,.6));
+        border-bottom: 1px solid var(--border);
+      }
+      .wrap{ max-width: 1100px; margin:0 auto; padding: 14px 20px }
+      .row{ display:flex; gap:12px; flex-wrap:wrap; align-items:center }
+      h1{ margin:0; font-size:1.15rem; letter-spacing:.3px }
+      .pill{
+        display:inline-flex; align-items:center; gap:8px;
+        padding:6px 10px; border:1px solid var(--border); border-radius: 999px;
+        color: var(--muted); font-size:.85rem
+      }
+      .pill strong{ color: var(--text) }
+
+      main{ max-width:1100px; margin:18px auto; padding:0 20px 40px }
+      .panels{ display:grid; grid-template-columns: 1fr 320px; gap:16px }
+      @media (max-width:980px){ .panels{ grid-template-columns:1fr } }
+
+      .panel{
+        background: var(--panel); border:1px solid var(--border);
+        border-radius:14px; box-shadow: var(--shadow)
+      }
+      .panel > .head{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; border-bottom:1px solid var(--border) }
+      .panel > .head h2{ margin:0; font-size:1rem }
+      .panel .content{ padding: 12px 14px }
+
+      .toolbar{ display:flex; gap:10px; flex-wrap:wrap }
+      input[type="search"], select, input[type="text"], textarea{
+        background: var(--input); border:1px solid var(--border); color: var(--text);
+        padding:10px 12px; border-radius:10px; outline:none;
+      }
+      input[type="search"]{ min-width:220px }
+      button{
+        background: var(--input); border:1px solid var(--border); color:var(--text); cursor:pointer;
+        padding:10px 14px; border-radius:10px; transition: transform .06s ease-in-out, background .2s;
+      }
+      button:hover{ background:#0e1724 }
+      button:active{ transform: translateY(1px) }
+
+      .badge{ display:inline-flex; align-items:center; gap:6px; font-size:.78rem; background:var(--badge); padding:6px 10px; border-radius:999px; border:1px solid #233247; color:var(--muted) }
+      .dot{ width:8px; height:8px; border-radius:50% }
+      .dot.green{ background:var(--green) }
+      .dot.yellow{ background:var(--yellow) }
+      .dot.red{ background:var(--red) }
+      .dot.blue{ background:var(--blue) }
+
+      .list{ display:grid; gap:12px }
+      .card{ border:1px solid var(--border); background:linear-gradient(180deg, var(--card), #0b1118); border-radius:14px; padding:14px; box-shadow:var(--shadow) }
+      .card .top{ display:flex; justify-content:space-between; gap:10px; align-items:center; flex-wrap:wrap }
+      .card h3{ margin:0; font-size:1rem }
+      .meta{ font-size:.85rem; color:var(--muted) }
+      .grid{ display:grid; gap:12px }
+      .grid.cols-2{ grid-template-columns: 1fr 1fr }
+      @media (max-width:760px){ .grid.cols-2{ grid-template-columns:1fr } }
+
+      .progress{ height:10px; background:var(--input); border:1px solid var(--border); border-radius:999px; overflow:hidden }
+      .progress > div{ height:100% }
+
+      details{ background:var(--input); border:1px solid var(--border); border-radius:12px }
+      details>summary{
+        cursor:pointer; list-style:none; padding:10px 12px; user-select:none; color:var(--text);
+      }
+      details>summary::-webkit-details-marker{ display:none }
+      details .inner{
+        padding:10px 12px; border-top:1px dashed var(--border);
+        overflow-x:auto; max-width:100%;
+      }
+
+      .table{ width:100%; border-collapse:collapse; font-size:.9rem; table-layout:fixed; }
+      .table th, .table td{
+        padding:10px 12px; border-bottom:1px solid var(--border); text-align:left; vertical-align:middle;
+        overflow:hidden;
+      }
+      .table tbody tr:nth-child(odd){ background: rgba(255,255,255,0.02) }
+      .table tbody tr:hover{ background: rgba(118,169,250,0.07) }
+      .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace }
+
+      /* célula combinada de tokens */
+      td.tokencell{ min-width:0 }
+      .tokencell .line{
+        display:grid;
+        grid-template-columns: auto minmax(0,1fr) auto; /* [label] [hash…] [copy] */
+        align-items:center;
+        gap:8px;
+        margin:4px 0;
+      }
+      .tokencell .label{
+        font-size:.78rem; color:var(--muted);
+        padding:2px 6px; border:1px solid var(--border); border-radius:999px; background:var(--input)
+      }
+      .tokencell .hash{
+        display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;
+      }
+
+      .btn-copy{ font-size:.85rem; padding:2px 6px; border-radius:8px; border:1px solid var(--border); background:var(--input); color:var(--text); cursor:pointer; line-height:1 }
+      .btn-copy:hover{ background:#0e1724 }
+
+      .hint{ font-size:.85rem; color:var(--muted) }
+      .empty{ padding:18px; text-align:center; color:var(--muted) }
+      .toast{
+        position:fixed; right:16px; bottom:16px; background:var(--input); color:var(--text);
+        border:1px solid var(--border); padding:10px 12px; border-radius:10px; box-shadow:var(--shadow); opacity:.98
+      }
+
+      @media (prefers-reduced-motion: reduce){
+        *{ animation: none !important; transition: none !important }
+      }
     </style>
   </head>
   <body>
+    <header>
+      <div class="wrap row" role="navigation" aria-label="Barra superior">
+        <h1>📊 Votações — Visualizador</h1>
+        <span id="lastUpdate" class="pill" aria-live="polite">Atualizado: <strong>–</strong></span>
+        <span id="sourceCount" class="pill">Fontes: <strong>0</strong></span>
+      </div>
+    </header>
+
     <main>
-      <h1>Resultado da Simulação</h1>
-      <p id="status" class="meta">Carregando dados...</p>
-      <div id="results"></div>
+      <div class="panels">
+        <!-- PAINEL PRINCIPAL -->
+        <section class="panel" aria-labelledby="lbl-pautas">
+          <div class="head">
+            <h2 id="lbl-pautas">Pautas</h2>
+            <div class="toolbar" role="group" aria-label="Ferramentas de filtro e atualização">
+              <input id="q" type="search" placeholder="Buscar por nome da pauta ou opção…" aria-label="Buscar" />
+              <label for="statusFilter" class="visually-hidden" style="position:absolute;left:-10000px">Status</label>
+              <select id="statusFilter" title="Filtrar por status" aria-label="Filtrar por status">
+                <option value="all">Todas</option>
+                <option value="running">Em andamento</option>
+                <option value="finalized">Finalizadas</option>
+                <option value="scheduled">Agendadas</option>
+              </select>
+              <button id="refreshBtn" aria-label="Atualizar agora">Atualizar</button>
+              <button id="autoBtn" aria-pressed="false" aria-label="Alternar atualização automática a cada 10 segundos">Auto (10s)</button>
+            </div>
+          </div>
+
+          <div class="content">
+            <div class="row" style="margin-bottom:10px">
+              <span class="badge"><span class="dot blue" aria-hidden="true"></span> Agendada</span>
+              <span class="badge"><span class="dot yellow" aria-hidden="true"></span> Em andamento</span>
+              <span class="badge"><span class="dot green" aria-hidden="true"></span> Finalizada</span>
+            </div>
+            <div id="list" class="list" role="region" aria-live="polite"></div>
+          </div>
+        </section>
+
+        <!-- PAINEL DE FONTES -->
+        <aside class="panel" aria-labelledby="lbl-fontes">
+          <div class="head"><h2 id="lbl-fontes">Fontes de dados</h2></div>
+          <div class="content grid">
+            <div>
+              <label class="hint" for="sources">Arquivos cache a ler (um por linha)</label>
+              <textarea id="sources" rows="9" placeholder="/cache/simulate-result.json
+/cache/simulate-condominio.json
+/cache/simulate-assembleia-garagem.json"></textarea>
+              <div class="hint">Dica: adicione qualquer outro .json que o simulador gerar.</div>
+            </div>
+            <div>
+              <label class="hint" for="quickUrl">Ou adicione uma URL rápida</label>
+              <div class="row">
+                <input id="quickUrl" type="text" placeholder="/cache/outro.json" />
+                <button id="addUrlBtn">Adicionar</button>
+              </div>
+              <hr style="border:none;border-top:1px solid var(--border);margin:14px 0"/>
+              <div class="hint">Formato esperado (flexível):</div>
+              <ul class="hint" style="margin-top:8px; padding-left:18px">
+                <li><code class="mono">{ pauta, generatedAt, votes:[{ pauta, voto, voteToken, voterToken, start, end }] }</code></li>
+                <li>ou vários objetos de pauta em um array: <code class="mono">[{ pauta, generatedAt, votes:[...] }, ...]</code></li>
+              </ul>
+            </div>
+          </div>
+        </aside>
+      </div>
     </main>
 
     <script type="module">
-      const statusEl = document.querySelector('#status');
-      const resultsEl = document.querySelector('#results');
+      // ---------- Utils ----------
+      const $  = (sel, el=document) => el.querySelector(sel);
+      const $$ = (sel, el=document) => Array.from(el.querySelectorAll(sel));
 
-      async function loadSimulation() {
-        try {
-          const response = await fetch('/cache/simulate-result.json', { cache: 'no-store' });
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          const data = await response.json();
+      const listEl         = $('#list');
+      const lastUpdateEl   = $('#lastUpdate strong');
+      const sourceCountEl  = $('#sourceCount strong');
+      const qEl            = $('#q');
+      const statusFilterEl = $('#statusFilter');
+      const refreshBtn     = $('#refreshBtn');
+      const autoBtn        = $('#autoBtn');
+      const sourcesEl      = $('#sources');
+      const quickUrlEl     = $('#quickUrl');
+      const addUrlBtn      = $('#addUrlBtn');
 
-          if (!Array.isArray(data.votes) || data.votes.length === 0) {
-            statusEl.textContent = 'Nenhum voto encontrado. Execute `npm run simulate` após iniciar o nó local.';
-            return;
+      const DEFAULT_SOURCES = [
+        '/cache/simulate-result.json',
+        '/cache/simulate-condominio.json',
+        '/cache/simulate-assembleia-garagem.json',
+      ];
+
+      let autoTimer = null;
+      let pautas = []; // [{name, generatedAt, start, end, votes:[...]}]
+      let qDebounce = 0;
+
+      function toBRDate(ts){ try { return new Date(ts).toLocaleString('pt-BR'); } catch { return String(ts); } }
+      function asMillis(x){
+        if(x==null) return null;
+        const n = typeof x === 'string' ? Number(x) : x;
+        if(!Number.isFinite(n)) return null;
+        return n > 1e12 ? n : n*1000; // aceita segundos ou millis
+      }
+      function formatMaybeDate(x){
+        const m = asMillis(x);
+        if(m==null) return '—';
+        const d = new Date(m);
+        return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('pt-BR');
+      }
+
+      // ---------- Normalização / Merge ----------
+      function normalizePayload(payload){
+        const arr = Array.isArray(payload) ? payload : [payload];
+        const out = [];
+        for(const item of arr){
+          if(!item) continue;
+          const name = item.pauta || item.name || 'Pauta';
+          const generatedAt = item.generatedAt || item.updatedAt || Date.now();
+          const votes = Array.isArray(item.votes) ? item.votes : [];
+          const startAt = item.startAt ?? item.commitStartAt ?? item.start ?? null;
+          const commitEndAt = item.commitEndAt ?? null;
+          const endAt = item.endAt ?? item.revealEndAt ?? item.end ?? null;
+
+          const starts = votes.map(v => Number(v.start)||0).filter(Boolean);
+          const ends   = votes.map(v => Number(v.end)||0).filter(Boolean);
+          const start  = asMillis(startAt) ?? (starts.length ? asMillis(Math.min(...starts)) : undefined);
+          const end    = asMillis(endAt)   ?? (ends.length   ? asMillis(Math.max(...ends))   : undefined);
+
+          out.push({ name, generatedAt, startAt: asMillis(startAt) ?? undefined, commitEndAt: asMillis(commitEndAt) ?? undefined, endAt: asMillis(endAt) ?? undefined, start, end, votes });
+        }
+        return out;
+      }
+
+      function mergeByName(items){
+        const map = new Map();
+        for(const p of items){
+          const key = p.name;
+          const prev = map.get(key);
+          if(!prev){ map.set(key, { ...p }); continue; }
+          map.set(key, {
+            name: key,
+            generatedAt: Math.max(prev.generatedAt||0, p.generatedAt||0),
+            start: Math.min(prev.start||Infinity, p.start||Infinity),
+            end:   Math.max(prev.end||0,   p.end||0),
+            votes: [...(prev.votes||[]), ...(p.votes||[])],
+            startAt: prev.startAt ?? p.startAt,
+            endAt:   prev.endAt   ?? p.endAt,
+            commitEndAt: prev.commitEndAt ?? p.commitEndAt,
+          });
+        }
+        return Array.from(map.values());
+      }
+
+      function statusFor(p){
+        const now = Date.now();
+        if(p.end && now >= p.end) return { key:'finalized', label:'Finalizada', dot:'green' };
+        if(p.start && now < p.start) return { key:'scheduled', label:'Agendada', dot:'blue' };
+        return { key:'running', label:'Em andamento', dot:'yellow' };
+      }
+
+      function groupByOption(votes){
+        const map = new Map();
+        for(const v of votes){
+          const opt = String(v.voto ?? v.option ?? '—');
+          map.set(opt, (map.get(opt)||0) + 1);
+        }
+        const total = votes.length || 1;
+        return Array.from(map.entries()).map(([option, count]) => ({ option, count, pct: (count/total)*100 }));
+      }
+
+      // ---------- Render ----------
+      function render(){
+        const q = qEl.value.trim().toLowerCase();
+        const statusFilter = statusFilterEl.value;
+        listEl.innerHTML = '';
+
+        const items = pautas
+          .map(p => ({ ...p, status: statusFor(p) }))
+          .filter(p => (
+            (statusFilter==='all' || p.status.key===statusFilter) &&
+            (q==='' || p.name.toLowerCase().includes(q) || p.votes.some(v => String(v.voto).toLowerCase().includes(q)))
+          ));
+
+        if(!items.length){
+          const empty = document.createElement('div');
+          empty.className = 'empty';
+          empty.textContent = 'Nenhuma pauta encontrada com o filtro atual.';
+          listEl.appendChild(empty);
+          return;
+        }
+
+        for(const p of items){
+          const card = document.createElement('article');
+          card.className = 'card';
+
+          // topo
+          const top = document.createElement('div');
+          top.className = 'top';
+          const h3 = document.createElement('h3');
+          h3.textContent = p.name;
+          const badge = document.createElement('span');
+          badge.className = 'badge';
+          badge.innerHTML = `<span class="dot ${p.status.dot}"></span>${p.status.label}`;
+          top.appendChild(h3); top.appendChild(badge);
+
+          // meta
+          const meta = document.createElement('div');
+          meta.className = 'meta';
+          const startTxt = formatMaybeDate(p.startAt ?? p.start);
+          const endTxt   = formatMaybeDate(p.endAt ?? p.end);
+          meta.textContent = `Janela: ${startTxt} → ${endTxt} · Registros: ${p.votes.length} · Fonte: ${toBRDate(p.generatedAt)}`;
+
+          // grid
+          const grid = document.createElement('div');
+          grid.className = 'grid cols-2';
+
+          // esquerda: contagem
+          const left = document.createElement('div');
+          const tally = groupByOption(p.votes).sort((a,b)=>b.count-a.count);
+          if(!tally.length){
+            left.innerHTML = '<div class="hint">Sem votos.</div>';
+          } else {
+            for(const row of tally){
+              const label = document.createElement('div');
+              label.className = 'row';
+              label.style.justifyContent = 'space-between';
+              label.innerHTML = `<div class="mono">${row.option}</div><div>${row.count} (${row.pct.toFixed(1)}%)</div>`;
+              const bar = document.createElement('div');
+              bar.className = 'progress';
+              const fill = document.createElement('div');
+              fill.style.width = `${row.pct}%`;
+              fill.style.background = 'linear-gradient(90deg, var(--blue), var(--purple))';
+              bar.appendChild(fill);
+              left.appendChild(label);
+              left.appendChild(bar);
+            }
           }
 
-          const header = `Última simulação gerada em ${new Date(data.generatedAt).toLocaleString('pt-BR')} para a pauta "${data.pauta}"`;
-          statusEl.textContent = header;
+          // direita: horários
+          const right = document.createElement('div');
+          right.innerHTML = `
+            <div class="row" style="justify-content:space-between">
+              <div class="badge"><span class="dot blue"></span> Início: <span class="mono">${startTxt}</span></div>
+              <div class="badge"><span class="dot ${p.status.dot}"></span> Fim: <span class="mono">${endTxt}</span></div>
+            </div>
+            <div class="hint" style="margin-top:8px">Clique para ver detalhes individuais (tokens e carimbos de tempo).</div>
+          `;
+          grid.appendChild(left); grid.appendChild(right);
 
-          data.votes.forEach((vote) => {
-            const line = document.createElement('div');
-            line.className = 'result-line';
-            line.textContent = `${vote.pauta} | ${vote.voteToken} | ${vote.voterToken} | ${vote.voto} | ${vote.start} | ${vote.end}`;
-            resultsEl.appendChild(line);
+          // detalhes
+          const details = document.createElement('details');
+          const summary = document.createElement('summary');
+          summary.textContent = 'Detalhar registros';
+          const inner = document.createElement('div');
+          inner.className = 'inner';
+
+          const table = document.createElement('table');
+          table.className = 'table';
+          table.innerHTML = `
+            <colgroup>
+              <col style="width:56px" />
+              <col style="width:120px" />
+              <col /> <!-- coluna única para tokens -->
+            </colgroup>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Opção</th>
+                <th class="mono">Vote Token / Voter Token</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          `;
+          const tbody = $('tbody', table);
+
+          p.votes.forEach((v, i) => {
+            const tr = document.createElement('tr');
+            const voteTok  = v.voteToken  ?? '—';
+            const voterTok = v.voterToken ?? '—';
+            tr.innerHTML = `
+              <td class="mono">${i+1}</td>
+              <td class="mono">${v.voto ?? v.option ?? '—'}</td>
+              <td class="mono tokencell">
+                <div class="line">
+                  <span class="label">vote</span>
+                  <span class="hash" title="${voteTok}">${voteTok}</span>
+                  <button class="btn-copy" data-copy="${voteTok}" title="Copiar vote token" aria-label="Copiar vote token">⧉</button>
+                </div>
+                <div class="line">
+                  <span class="label">voter</span>
+                  <span class="hash" title="${voterTok}">${voterTok}</span>
+                  <button class="btn-copy" data-copy="${voterTok}" title="Copiar voter token" aria-label="Copiar voter token">⧉</button>
+                </div>
+              </td>
+            `;
+            tbody.appendChild(tr);
           });
-        } catch (error) {
-          statusEl.textContent = 'Erro ao carregar dados da simulação. Confirme se o arquivo cache/simulate-result.json existe.';
-          statusEl.classList.add('error');
-          console.error(error);
+
+          inner.appendChild(table);
+          details.appendChild(summary);
+          details.appendChild(inner);
+
+          card.appendChild(top);
+          card.appendChild(meta);
+          card.appendChild(grid);
+          card.appendChild(details);
+          listEl.appendChild(card);
         }
       }
 
-      loadSimulation();
+      // ---------- Data I/O ----------
+      async function fetchJSON(url){
+        const res = await fetch(url, { cache:'no-store' });
+        if(!res.ok) throw new Error(`Falha ao ler ${url}: HTTP ${res.status}`);
+        return res.json();
+      }
+
+      async function load(){
+        const urls = sourcesEl.value
+          .split(/\n|\r/)
+          .map(s => s.trim())
+          .filter(Boolean);
+
+        const results = [];
+        let ok = 0;
+        for(const url of urls){
+          try{
+            const payload = await fetchJSON(url);
+            results.push(...normalizePayload(payload));
+            ok++;
+          }catch(err){
+            console.warn(err);
+          }
+        }
+        pautas = mergeByName(results);
+        render();
+        lastUpdateEl.textContent = toBRDate(Date.now());
+        sourceCountEl.textContent = String(ok);
+
+        // persistir fontes
+        try{ localStorage.setItem('voteviewer.sources', sourcesEl.value); }catch{}
+      }
+
+      // ---------- UX helpers ----------
+      function showToast(msg){
+        const t = document.createElement('div');
+        t.className = 'toast';
+        t.textContent = msg;
+        document.body.appendChild(t);
+        setTimeout(()=> t.remove(), 1600);
+      }
+
+      // Delegação global para copiar (funciona com elementos dinâmicos)
+      document.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.btn-copy');
+        if(!btn) return;
+        const text = btn.getAttribute('data-copy') || '';
+        if(!text) return;
+        try{
+          await navigator.clipboard.writeText(text);
+          showToast('Copiado!');
+        }catch{
+          showToast('Não foi possível copiar');
+        }
+      });
+
+      // ---------- Eventos ----------
+      refreshBtn.addEventListener('click', load);
+
+      qEl.addEventListener('input', () => {
+        clearTimeout(qDebounce);
+        qDebounce = setTimeout(render, 150);
+      });
+
+      statusFilterEl.addEventListener('change', render);
+
+      addUrlBtn.addEventListener('click', () => {
+        const url = quickUrlEl.value.trim();
+        if(!url) return;
+        const lines = sourcesEl.value.trim();
+        sourcesEl.value = [lines, url].filter(Boolean).join('\n');
+        quickUrlEl.value = '';
+        load();
+      });
+
+      autoBtn.addEventListener('click', () => {
+        const pressed = autoBtn.getAttribute('aria-pressed') === 'true';
+        if(pressed){
+          autoBtn.setAttribute('aria-pressed','false');
+          autoBtn.textContent = 'Auto (10s)';
+          if(autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+        } else {
+          autoBtn.setAttribute('aria-pressed','true');
+          autoBtn.textContent = 'Auto: ON (10s)';
+          if(autoTimer) clearInterval(autoTimer);
+          autoTimer = setInterval(load, 10000);
+        }
+      });
+
+      // ---------- Boot ----------
+      (function init(){
+        // restaurar fontes salvas
+        try{
+          const saved = localStorage.getItem('voteviewer.sources');
+          if(saved && saved.trim()){
+            sourcesEl.value = saved;
+          }
+        }catch{}
+        if(!sourcesEl.value.trim()){
+          sourcesEl.value = DEFAULT_SOURCES.join('\n');
+        }
+        load();
+      })();
     </script>
   </body>
 </html>
