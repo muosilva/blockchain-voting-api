@@ -1,0 +1,325 @@
+{
+  "defaults": {
+    "issuerIndex": 0,
+    "voterOffset": 1,
+    "resetStateBetweenSimulations": true,
+    "timing": {
+      "startDelay": 5,
+      "commitDuration": 60,
+      "revealDuration": 60
+    }
+  },
+  "simulations": [
+    {
+      "id": "garagem-expansao",
+      "name": "Expansão de Garagem - Votação Opções",
+      "options": [
+        "Opção 1: Ampliação com 5 vagas (R$ 300.000)",
+        "Opção 2: Ampliação com 3 vagas (R$ 220.000)",
+        "Opção 3: Reforma e melhorias existentes (R$ 180.000)"
+      ],
+      "votes": [
+        {
+          "optionIndex": 0,
+          "label": "Condomínio Residencial Parque das Flores"
+        },
+        {
+          "option": "Opção 2: Ampliação com 3 vagas (R$ 220.000)",
+          "label": "Associação de Moradores Vista Verde"
+        },
+        {
+          "optionIndex": 1,
+          "label": "Morador 1 - Apto 1001"
+        },
+        {
+          "option": "Opção 3: Reforma e melhorias existentes (R$ 180.000)",
+          "label": "Condomínio Solar do Bosque"
+        },
+        {
+          "optionIndex": 0,
+          "label": "Morador 2 - Apto 2005"
+        }
+      ]
+    },
+    {
+      "id": "reformas-elevador",
+      "name": "Reforma do Elevador - Votação Orçamentos",
+      "options": [
+        "Empresa X - R$ 190.000,00",
+        "Empresa Y - R$ 210.000,00",
+        "Empresa Z - R$ 175.000,00",
+        "Empresa W - R$ 230.000,00"
+      ],
+      "votes": [
+        {
+          "optionIndex": 0,
+          "label": "Morador 3 - Apto 3001"
+        },
+        {
+          "option": "Empresa Y - R$ 210.000,00",
+          "label": "Condomínio Jardim das Acácias"
+        },
+        {
+          "optionIndex": 2,
+          "label": "Associação de Moradores Flores da Vila"
+        },
+        {
+          "option": "Empresa W - R$ 230.000,00",
+          "label": "Morador 4 - Apto 4005"
+        },
+        {
+          "optionIndex": 1,
+          "label": "Condomínio Solar das Palmeiras"
+        }
+      ]
+    },
+    {
+      "id": "orcamento-obras-piso",
+      "name": "Orçamento de Obras - Reforma Piso da Área Comum",
+      "options": [
+        "Opção 1: Cerâmica Azul Bahia (R$ 250.000)",
+        "Opção 2: Porcelanato Imola (R$ 380.000)",
+        "Opção 3: Vinílico Premium (R$ 220.000)"
+      ],
+      "votes": [
+        {
+          "optionIndex": 0,
+          "label": "Morador 5 - Apto 5001"
+        },
+        {
+          "option": "Opção 2: Porcelanato Imola (R$ 380.000)",
+          "label": "Condomínio Residencial Vista Alegre"
+        },
+        {
+          "optionIndex": 2,
+          "label": "Associação de Moradores Jardim das Flores"
+        },
+        {
+          "option": "Opção 1: Cerâmica Azul Bahia (R$ 250.000)",
+          "label": "Morador 6 - Apto 6005"
+        },
+        {
+          "optionIndex": 1,
+          "label": "Condomínio Solar do Bosque"
+        }
+      ]
+    },
+    {
+      "id": "obras-emergencias-telhado",
+      "name": "Obras de Emergência - Reparo Telhado",
+      "options": [
+        "Empresa Alfa - R$ 85.000,00",
+        "Empresa Beta - R$ 92.000,00",
+        "Empresa Gama - R$ 78.000,00"
+      ],
+      "votes": [
+        {
+          "optionIndex": 0,
+          "label": "Morador 7 - Apto 7001"
+        },
+        {
+          "option": "Empresa Beta - R$ 92.000,00",
+          "label": "Associação de Moradores Flores da Vila"
+        },
+        {
+          "optionIndex": 2,
+          "label": "Condomínio Residencial Vista Alegre"
+        },
+        {
+          "option": "Empresa Gama - R$ 78.000,00",
+          "label": "Morador 8 - Apto 8005"
+        },
+        {
+          "optionIndex": 1,
+          "label": "Condomínio Solar das Palmeiras"
+        }
+      ]
+    },
+    {
+      "id": "sustentabilidade-painel-solar",
+      "name": "Instalação de Painéis Solares - Sustentabilidade",
+      "options": [
+        "Opção 1: Sistema Básico (R$ 150.000)",
+        "Opção 2: Sistema Avançado (R$ 220.000)",
+        "Opção 3: Sistema Premium (R$ 280.000)"
+      ],
+      "votes": [
+        {
+          "optionIndex": 0,
+          "label": "Morador 9 - Apto 9001"
+        },
+        {
+          "option": "Opção 2: Sistema Avançado (R$ 220.000)",
+          "label": "Condomínio Jardim das Acácias"
+        },
+        {
+          "optionIndex": 1,
+          "label": "Associação de Moradores Vista Verde"
+        },
+        {
+          "option": "Opção 3: Sistema Premium (R$ 280.000)",
+          "label": "Morador 10 - Apto 1005"
+        },
+        {
+          "optionIndex": 2,
+          "label": "Condomínio Solar do Bosque"
+        }
+      ]
+    },
+    {
+      "id": "garagem-cobertura-v2",
+      "name": "Cobertura - Votação de Opções",
+      "options": [
+        "Opção 1: Cobertura em Concreto (R$ 350.000)",
+        "Opção 2: Cobertura em Aço (R$ 420.000)",
+        "Opção 3: Cobertura com Telha Cerâmica (R$ 280.000)"
+      ],
+      "votes": [
+        {
+          "optionIndex": 0,
+          "label": "Morador 11 - Apto 1101"
+        },
+        {
+          "option": "Opção 2: Cobertura em Aço (R$ 420.000)",
+          "label": "Condomínio Residencial Vista Alegre"
+        },
+        {
+          "optionIndex": 2,
+          "label": "Associação de Moradores Jardim das Flores"
+        },
+        {
+          "option": "Opção 3: Cobertura com Telha Cerâmica (R$ 280.000)",
+          "label": "Morador 12 - Apto 1205"
+        },
+        {
+          "optionIndex": 1,
+          "label": "Condomínio Solar das Palmeiras"
+        }
+      ]
+    },
+    {
+      "id": "reformas-elevador-v2",
+      "name": "Reforma Elevador - Opções de Orçamento",
+      "options": [
+        "Empresa 1: R$ 230.000",
+        "Empresa 2: R$ 255.000",
+        "Empresa 3: R$ 210.000"
+      ],
+      "votes": [
+        {
+          "optionIndex": 0,
+          "label": "Morador 13 - Apto 1301"
+        },
+        {
+          "option": "Empresa 2: R$ 255.000",
+          "label": "Condomínio Residencial Vista Alegre"
+        },
+        {
+          "optionIndex": 2,
+          "label": "Associação de Moradores Jardim das Flores"
+        },
+        {
+          "option": "Empresa 3: R$ 210.000",
+          "label": "Morador 14 - Apto 1405"
+        },
+        {
+          "optionIndex": 1,
+          "label": "Condomínio Solar das Palmeiras"
+        }
+      ]
+    },
+    {
+      "id": "orcamento-obras-v2",
+      "name": "Orçamento de Obras - Reforma Cobertura",
+      "options": [
+        "Opção 1: Empresa A - R$ 160.000,00",
+        "Opção 2: Empresa B - R$ 185.000,00",
+        "Opção 3: Empresa C - R$ 170.000,00"
+      ],
+      "votes": [
+        {
+          "optionIndex": 0,
+          "label": "Morador 15 - Apto 1501"
+        },
+        {
+          "option": "Opção 2: Empresa B - R$ 185.000,00",
+          "label": "Condomínio Jardim das Acácias"
+        },
+        {
+          "optionIndex": 2,
+          "label": "Associação de Moradores Vista Verde"
+        },
+        {
+          "option": "Opção 3: Empresa C - R$ 170.000,00",
+          "label": "Morador 16 - Apto 1605"
+        },
+        {
+          "optionIndex": 1,
+          "label": "Condomínio Solar do Bosque"
+        }
+      ]
+    },
+    {
+      "id": "obras-emergencias-v2",
+      "name": "Obras de Emergência - Reparo Telhado",
+      "options": [
+        "Empresa Alfa - R$ 90.000,00",
+        "Empresa Beta - R$ 98.000,00",
+        "Empresa Gama - R$ 87.000,00"
+      ],
+      "votes": [
+        {
+          "optionIndex": 0,
+          "label": "Morador 17 - Apto 1701"
+        },
+        {
+          "option": "Empresa Beta - R$ 98.000,00",
+          "label": "Associação de Moradores Flores da Vila"
+        },
+        {
+          "optionIndex": 2,
+          "label": "Condomínio Residencial Vista Alegre"
+        },
+        {
+          "option": "Empresa Gama - R$ 87.000,00",
+          "label": "Morador 18 - Apto 1805"
+        },
+        {
+          "optionIndex": 1,
+          "label": "Condomínio Solar das Palmeiras"
+        }
+      ]
+    },
+    {
+      "id": "sustentabilidade-v2",
+      "name": "Instalação de Painéis Solares - Sustentabilidade",
+      "options": [
+        "Opção 1: Sistema Básico (R$ 170.000)",
+        "Opção 2: Sistema Avançado (R$ 250.000)",
+        "Opção 3: Sistema Premium (R$ 310.000)"
+      ],
+      "votes": [
+        {
+          "optionIndex": 0,
+          "label": "Morador 19 - Apto 1901"
+        },
+        {
+          "option": "Opção 2: Sistema Avançado (R$ 250.000)",
+          "label": "Condomínio Jardim das Acácias"
+        },
+        {
+          "optionIndex": 1,
+          "label": "Associação de Moradores Vista Verde"
+        },
+        {
+          "option": "Opção 3: Sistema Premium (R$ 310.000)",
+          "label": "Morador 20 - Apto 2005"
+        },
+        {
+          "optionIndex": 2,
+          "label": "Condomínio Solar do Bosque"
+        }
+      ]
+    }
+  ]
+}
