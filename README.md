@@ -102,6 +102,35 @@ Acesse `http://localhost:8080/frontend/index.html` (ajuste a porta/conjunto conf
 
 > Importante: sempre rode `npm run simulate` depois de iniciar o nó local para gerar um arquivo de resultados atualizado.
 
+## Geração de simulações via LM Studio
+
+Com o LM Studio rodando localmente (endpoint padrão `http://127.0.0.1:1234/v1/chat/completions`), você pode pedir à LLM que crie cenários prontos para o `scripts/simulate.js`. O script `scripts/generate-simulations-llm.js` grava o resultado em `scripts/simulations.json` no formato aceito pela simulação.
+
+```bash
+node scripts/generate-simulations-llm.js --model "nome-do-modelo-no-lm-studio"
+```
+
+Opções úteis:
+- `--count` (`-c`): quantidade de simulações desejadas (ex.: `--count 10`).
+- `--temperature`: ajusta a criatividade da resposta da LLM (padrão `0.4`).
+- `--endpoint`: URL do servidor caso não esteja em `127.0.0.1:1234`.
+- `--model`: nome do modelo carregado no LM Studio.
+- `--help`: mostra todas as flags disponíveis.
+
+Exemplo para gerar 20 simulações variadas de assembleias condominiais:
+
+```bash
+node scripts/generate-simulations-llm.js --model "nome-do-modelo-no-lm-studio" --count 20
+```
+
+Depois da geração, execute o simulador apontando para o arquivo criado:
+
+```bash
+npx hardhat run scripts/simulate.js --network localhost --config scripts/simulations.json
+```
+
+Assim você pode validar os cenários sugeridos pela LLM e alimentar a interface ou outros testes automatizados.
+
 ## Deploy manual (opcional)
 
 Caso queira fazer o deploy manual em outra rede Hardhat configurada, use:
