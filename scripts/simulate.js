@@ -1,8 +1,7 @@
 import { network } from "hardhat";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
+
 
 async function main() {
   const { ethers, provider } = await network.connect();
@@ -43,6 +42,11 @@ async function main() {
     const salt = ethers.hexlify(ethers.randomBytes(32));
     const credentialSecret = ethers.hexlify(ethers.randomBytes(32));
     const credentialHash = ethers.keccak256(credentialSecret);
+    const blindingFactor = ethers.hexlify(ethers.randomBytes(32));
+    const credentialBlind = ethers.solidityPackedKeccak256(
+      ["bytes32", "bytes32"],
+      [credentialHash, blindingFactor]
+    );
     const commitment = ethers.solidityPackedKeccak256(
       ["bytes32", "uint8", "bytes32"],
       [credentialHash, entry.optionIndex, salt]
@@ -51,7 +55,12 @@ async function main() {
       ["string", "bytes32"],
       ["SimpleVoting:", credentialHash]
     );
+    const blindMsgHash = ethers.solidityPackedKeccak256(
+      ["string", "bytes32"],
+      ["SimpleVoting:Blind", credentialBlind]
+    );
     const signature = await issuer.signMessage(ethers.getBytes(msgHash));
+    const blindSignature = await issuer.signMessage(ethers.getBytes(blindMsgHash));
 
     const commitTx = await contract.connect(voter).commitVote(credentialHash, commitment, signature);
     const commitReceipt = await commitTx.wait();
@@ -61,6 +70,9 @@ async function main() {
     entry.credentialSecret = credentialSecret;
     entry.credentialHash = credentialHash;
     entry.credentialSignature = signature;
+    entry.blindingFactor = blindingFactor;
+    entry.credentialBlind = credentialBlind;
+    entry.credentialBlindSignature = blindSignature;
     entry.commitTx = commitReceipt.hash;
     entry.commitCaller = voter.address;
 
@@ -88,6 +100,9 @@ async function main() {
       revealTx: revealReceipt.hash,
       credentialSecret: entry.credentialSecret,
       credentialSignature: entry.credentialSignature,
+      credentialBlind: entry.credentialBlind,
+      credentialBlindSignature: entry.credentialBlindSignature,
+      blindingFactor: entry.blindingFactor,
       salt: entry.salt,
       credentialDigest
     });
