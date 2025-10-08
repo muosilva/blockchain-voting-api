@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {Secp256k1} from "./lib/Secp256k1.sol";
+import {EllipticCurve} from "./lib/EllipticCurve.sol";
 
 /// @title Commit-Reveal voting contract for permissioned PoS networks
 /// @notice One proposal per contract. Each credential commits a vote hash and reveals later within the configured window.
 contract SimpleVoting {
+    uint256 private constant SECP_P = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F;
+    uint256 private constant SECP_N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141;
+
     // ======== Errors ========
     error CommitPhaseNotOpen();
     error CommitPhaseClosed();
@@ -52,12 +55,20 @@ contract SimpleVoting {
     uint256 public immutable commitEndAt;  // commit window end (unix)
     uint256 public immutable endAt;        // reveal window end (unix)
     uint256[] private _tally;              // votes per option
+    uint256 public immutable issuerPubKeyX;
+    uint256 public immutable issuerPubKeyY;
 
     enum Phase { NotStarted, Commit, Reveal, Ended }
 
     struct Ballot {
         bytes32 commitment;
         bool revealed;
+    }
+
+    struct BlindSignature {
+        uint256 s;
+        uint256 fx;
+        uint256 fy;
     }
 
     struct ElectionMetadata {
@@ -85,12 +96,16 @@ contract SimpleVoting {
         uint256 _startAt,
         uint256 _commitEndAt,
         uint256 _endAt,
-        address _issuer
+        address _issuer,
+        uint256 _issuerPubKeyX,
+        uint256 _issuerPubKeyY
     ) {
         if (bytes(_name).length == 0) revert EmptyName();
         if (optionLabels.length < 2) revert NeedAtLeastTwoOptions();
         if (_startAt == 0 || _commitEndAt <= _startAt || _endAt <= _commitEndAt) revert InvalidSchedule();
         if (_issuer == address(0)) revert InvalidIssuer();
+        if (_issuerPubKeyX == 0 || _issuerPubKeyY == 0) revert InvalidIssuer();
+        if (!EllipticCurve.isOnCurve(_issuerPubKeyX, _issuerPubKeyY, 0, 7, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F)) revert InvalidIssuer();
 
         owner = msg.sender;
         issuer = _issuer;
@@ -100,6 +115,8 @@ contract SimpleVoting {
         endAt = _endAt;
         _options = optionLabels;
         _tally = new uint256[](optionLabels.length);
+        issuerPubKeyX = _issuerPubKeyX;
+        issuerPubKeyY = _issuerPubKeyY;
     }
 
     modifier onlyOwner() {
@@ -111,7 +128,7 @@ contract SimpleVoting {
     /// @param credentialHash Blind credential hash representing the voter.
     /// @param commitment Hash computed via keccak256(credentialHash, optionIndex, salt).
     /// @param signature Signature issued by the credential authority over credentialHash.
-    function commitVote(bytes32 credentialHash, bytes32 commitment, bytes calldata signature) external {
+    function commitVote(bytes32 credentialHash, bytes32 commitment, BlindSignature calldata signature) external {
         uint256 t = _enforceCommitPhase();
         if (credentialHash == bytes32(0)) revert InvalidCredentialHash();
         if (commitment == bytes32(0)) revert ZeroCommitment();
@@ -119,10 +136,7 @@ contract SimpleVoting {
 
         Ballot storage ballot = _ballots[credentialHash];
         if (ballot.commitment != bytes32(0)) revert AlreadyCommitted();
-
-        bytes32 digest = _credentialSignDigest(credentialHash);
-        address recovered = ECDSA.recover(digest, signature);
-        if (recovered != issuer) revert InvalidCredentialSignature();
+        if (!_verifyBlindSignature(credentialHash, signature)) revert InvalidCredentialSignature();
 
         ballot.commitment = commitment;
         emit Committed(commitment, t);
@@ -179,9 +193,39 @@ contract SimpleVoting {
 
     // ======== Helpers ========
 
-    function _credentialSignDigest(bytes32 credentialHash) internal pure returns (bytes32) {
-        bytes32 msgHash = keccak256(abi.encodePacked("SimpleVoting:", credentialHash));
-        return MessageHashUtils.toEthSignedMessageHash(msgHash);
+    function _credentialMessage(bytes32 credentialHash) internal pure returns (bytes memory) {
+        return abi.encodePacked("SimpleVoting:", credentialHash);
+    }
+
+    function _computeChallenge(bytes32 credentialHash) internal pure returns (uint256) {
+        uint256 h = uint256(keccak256(_credentialMessage(credentialHash)));
+        return h % SECP_N;
+    }
+
+    function _verifyBlindSignature(bytes32 credentialHash, BlindSignature memory signature) internal view returns (bool) {
+        if (signature.s == 0 || signature.fx == 0 || signature.fy == 0) {
+            return false;
+        }
+        if (!EllipticCurve.isOnCurve(signature.fx, signature.fy, 0, 7, SECP_P)) {
+            return false;
+        }
+
+        uint256 rx = signature.fx % SECP_N;
+        if (rx == 0) {
+            return false;
+        }
+
+        uint256 challenge = _computeChallenge(credentialHash);
+        if (challenge == 0) {
+            return false;
+        }
+
+        uint256 scalar = mulmod(rx, challenge, SECP_N);
+        (uint256 lhsX, uint256 lhsY) = Secp256k1.mulG(signature.s % SECP_N);
+        (uint256 rhsXOffset, uint256 rhsYOffset) = Secp256k1.multiply(scalar, issuerPubKeyX, issuerPubKeyY);
+        (uint256 rhsX, uint256 rhsY) = Secp256k1.add(signature.fx, signature.fy, rhsXOffset, rhsYOffset);
+
+        return lhsX == rhsX && lhsY == rhsY;
     }
 
     function _enforceCommitPhase() private view returns (uint256 t) {
@@ -261,6 +305,10 @@ contract SimpleVoting {
         counts = _copyTally();
     }
 
+    function issuerPublicKey() external view returns (uint256 x, uint256 y) {
+        return (issuerPubKeyX, issuerPubKeyY);
+    }
+
     function ballotStatus(bytes32 credentialHash) external view returns (bytes32 commitment, bool revealed, bool revoked) {
         Ballot storage ballot = _ballots[credentialHash];
         commitment = ballot.commitment;
@@ -272,16 +320,14 @@ contract SimpleVoting {
         return _revoked[credentialHash];
     }
 
-    function verifyCredential(bytes32 credentialHash, bytes calldata signature) external view returns (bool) {
-        if (credentialHash == bytes32(0) || signature.length == 0) return false;
+    function verifyCredential(bytes32 credentialHash, BlindSignature calldata signature) external view returns (bool) {
+        if (credentialHash == bytes32(0)) return false;
         if (_revoked[credentialHash]) return false;
-
-        (address recovered, ECDSA.RecoverError err, ) = ECDSA.tryRecover(_credentialSignDigest(credentialHash), signature);
-        return err == ECDSA.RecoverError.NoError && recovered == issuer;
+        return _verifyBlindSignature(credentialHash, signature);
     }
 
     function credentialDigest(bytes32 credentialHash) external pure returns (bytes32) {
-        return _credentialSignDigest(credentialHash);
+        return keccak256(_credentialMessage(credentialHash));
     }
 
     function computeCommitment(bytes32 credentialHash, uint8 optionIndex, bytes32 salt) external pure returns (bytes32) {

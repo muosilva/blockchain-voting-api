@@ -6,6 +6,11 @@ import type { TypedContractEvent, TypedDeferredTopicFilter, TypedEventLog, Typed
   
 export declare namespace SimpleVoting {
       
+    export type BlindSignatureStruct = {s: BigNumberish, fx: BigNumberish, fy: BigNumberish}
+
+    export type BlindSignatureStructOutput = [s: bigint, fx: bigint, fy: bigint] & {s: bigint, fx: bigint, fy: bigint }
+  
+
     export type ElectionMetadataStruct = {name: string, owner: AddressLike, issuer: AddressLike, startAt: BigNumberish, commitEndAt: BigNumberish, endAt: BigNumberish, phase: BigNumberish, finalized: boolean, optionCount: BigNumberish, totalVotes: BigNumberish}
 
     export type ElectionMetadataStructOutput = [name: string, owner: string, issuer: string, startAt: bigint, commitEndAt: bigint, endAt: bigint, phase: bigint, finalized: boolean, optionCount: bigint, totalVotes: bigint] & {name: string, owner: string, issuer: string, startAt: bigint, commitEndAt: bigint, endAt: bigint, phase: bigint, finalized: boolean, optionCount: bigint, totalVotes: bigint }
@@ -13,7 +18,7 @@ export declare namespace SimpleVoting {
     }
 
   export interface SimpleVotingInterface extends Interface {
-    getFunction(nameOrSignature: "VERSION" | "addOption" | "ballotOf" | "ballotStatus" | "commitEndAt" | "commitVote" | "computeCommitment" | "credentialDigest" | "currentPhase" | "endAt" | "finalize" | "finalized" | "getOption" | "isCommitPhase" | "isCredentialRevoked" | "isOpen" | "isRevealPhase" | "issuer" | "leadingOption" | "metadata" | "name" | "optionCount" | "optionDetails" | "options" | "owner" | "restoreCredential" | "revealVote" | "revokeCredential" | "setName" | "startAt" | "tally" | "totalVotes" | "verifyCredential"): FunctionFragment;
+    getFunction(nameOrSignature: "VERSION" | "addOption" | "ballotOf" | "ballotStatus" | "commitEndAt" | "commitVote" | "computeCommitment" | "credentialDigest" | "currentPhase" | "endAt" | "finalize" | "finalized" | "getOption" | "isCommitPhase" | "isCredentialRevoked" | "isOpen" | "isRevealPhase" | "issuer" | "issuerPubKeyX" | "issuerPubKeyY" | "issuerPublicKey" | "leadingOption" | "metadata" | "name" | "optionCount" | "optionDetails" | "options" | "owner" | "restoreCredential" | "revealVote" | "revokeCredential" | "setName" | "startAt" | "tally" | "totalVotes" | "verifyCredential"): FunctionFragment;
 
     getEvent(nameOrSignatureOrTopic: "Committed" | "CredentialRestoredEvent" | "CredentialRevokedEvent" | "Finalized" | "NameUpdated" | "OptionAdded" | "Voted"): EventFragment;
 
@@ -22,7 +27,7 @@ encodeFunctionData(functionFragment: 'addOption', values: [string]): string;
 encodeFunctionData(functionFragment: 'ballotOf', values: [BytesLike]): string;
 encodeFunctionData(functionFragment: 'ballotStatus', values: [BytesLike]): string;
 encodeFunctionData(functionFragment: 'commitEndAt', values?: undefined): string;
-encodeFunctionData(functionFragment: 'commitVote', values: [BytesLike, BytesLike, BytesLike]): string;
+encodeFunctionData(functionFragment: 'commitVote', values: [BytesLike, BytesLike, SimpleVoting.BlindSignatureStruct]): string;
 encodeFunctionData(functionFragment: 'computeCommitment', values: [BytesLike, BigNumberish, BytesLike]): string;
 encodeFunctionData(functionFragment: 'credentialDigest', values: [BytesLike]): string;
 encodeFunctionData(functionFragment: 'currentPhase', values?: undefined): string;
@@ -35,6 +40,9 @@ encodeFunctionData(functionFragment: 'isCredentialRevoked', values: [BytesLike])
 encodeFunctionData(functionFragment: 'isOpen', values?: undefined): string;
 encodeFunctionData(functionFragment: 'isRevealPhase', values?: undefined): string;
 encodeFunctionData(functionFragment: 'issuer', values?: undefined): string;
+encodeFunctionData(functionFragment: 'issuerPubKeyX', values?: undefined): string;
+encodeFunctionData(functionFragment: 'issuerPubKeyY', values?: undefined): string;
+encodeFunctionData(functionFragment: 'issuerPublicKey', values?: undefined): string;
 encodeFunctionData(functionFragment: 'leadingOption', values?: undefined): string;
 encodeFunctionData(functionFragment: 'metadata', values?: undefined): string;
 encodeFunctionData(functionFragment: 'name', values?: undefined): string;
@@ -49,7 +57,7 @@ encodeFunctionData(functionFragment: 'setName', values: [string]): string;
 encodeFunctionData(functionFragment: 'startAt', values?: undefined): string;
 encodeFunctionData(functionFragment: 'tally', values?: undefined): string;
 encodeFunctionData(functionFragment: 'totalVotes', values?: undefined): string;
-encodeFunctionData(functionFragment: 'verifyCredential', values: [BytesLike, BytesLike]): string;
+encodeFunctionData(functionFragment: 'verifyCredential', values: [BytesLike, SimpleVoting.BlindSignatureStruct]): string;
 
     decodeFunctionResult(functionFragment: 'VERSION', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'addOption', data: BytesLike): Result;
@@ -69,6 +77,9 @@ decodeFunctionResult(functionFragment: 'isCredentialRevoked', data: BytesLike): 
 decodeFunctionResult(functionFragment: 'isOpen', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'isRevealPhase', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'issuer', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'issuerPubKeyX', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'issuerPubKeyY', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'issuerPublicKey', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'leadingOption', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'metadata', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'name', data: BytesLike): Result;
@@ -246,7 +257,7 @@ decodeFunctionResult(functionFragment: 'verifyCredential', data: BytesLike): Res
 
     
     commitVote: TypedContractMethod<
-      [credentialHash: BytesLike, commitment: BytesLike, signature: BytesLike, ],
+      [credentialHash: BytesLike, commitment: BytesLike, signature: SimpleVoting.BlindSignatureStruct, ],
       [void],
       'nonpayable'
     >
@@ -344,6 +355,30 @@ decodeFunctionResult(functionFragment: 'verifyCredential', data: BytesLike): Res
     issuer: TypedContractMethod<
       [],
       [string],
+      'view'
+    >
+    
+
+    
+    issuerPubKeyX: TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >
+    
+
+    
+    issuerPubKeyY: TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >
+    
+
+    
+    issuerPublicKey: TypedContractMethod<
+      [],
+      [[bigint, bigint] & {x: bigint, y: bigint }],
       'view'
     >
     
@@ -462,7 +497,7 @@ decodeFunctionResult(functionFragment: 'verifyCredential', data: BytesLike): Res
 
     
     verifyCredential: TypedContractMethod<
-      [credentialHash: BytesLike, signature: BytesLike, ],
+      [credentialHash: BytesLike, signature: SimpleVoting.BlindSignatureStruct, ],
       [boolean],
       'view'
     >
@@ -497,7 +532,7 @@ getFunction(nameOrSignature: 'commitEndAt'): TypedContractMethod<
       'view'
     >;
 getFunction(nameOrSignature: 'commitVote'): TypedContractMethod<
-      [credentialHash: BytesLike, commitment: BytesLike, signature: BytesLike, ],
+      [credentialHash: BytesLike, commitment: BytesLike, signature: SimpleVoting.BlindSignatureStruct, ],
       [void],
       'nonpayable'
     >;
@@ -559,6 +594,21 @@ getFunction(nameOrSignature: 'isRevealPhase'): TypedContractMethod<
 getFunction(nameOrSignature: 'issuer'): TypedContractMethod<
       [],
       [string],
+      'view'
+    >;
+getFunction(nameOrSignature: 'issuerPubKeyX'): TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >;
+getFunction(nameOrSignature: 'issuerPubKeyY'): TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >;
+getFunction(nameOrSignature: 'issuerPublicKey'): TypedContractMethod<
+      [],
+      [[bigint, bigint] & {x: bigint, y: bigint }],
       'view'
     >;
 getFunction(nameOrSignature: 'leadingOption'): TypedContractMethod<
@@ -632,7 +682,7 @@ getFunction(nameOrSignature: 'totalVotes'): TypedContractMethod<
       'view'
     >;
 getFunction(nameOrSignature: 'verifyCredential'): TypedContractMethod<
-      [credentialHash: BytesLike, signature: BytesLike, ],
+      [credentialHash: BytesLike, signature: SimpleVoting.BlindSignatureStruct, ],
       [boolean],
       'view'
     >;

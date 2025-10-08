@@ -2,11 +2,18 @@ import { network } from "hardhat";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import {
+  createIssuer,
+  issueBlindCredential,
+  signatureStructToHex
+} from "./blindSignature.js";
 
 async function main() {
   const { ethers, provider } = await network.connect();
-  const [issuer, ...accounts] = await ethers.getSigners();
+  const [deployer, ...accounts] = await ethers.getSigners();
   const voters = accounts.slice(0, 5);
+
+  const issuer = createIssuer(ethers);
 
   const name = "Condominio";
   const options = ["A", "B"];
@@ -19,12 +26,23 @@ async function main() {
   const endISO = new Date(endAt * 1000).toISOString();
 
   const F = await ethers.getContractFactory("SimpleVoting");
-  const contract = await F.connect(issuer).deploy(name, options, startAt, commitEndAt, endAt, issuer.address);
+  const contract = await F.connect(deployer).deploy(
+    name,
+    options,
+    startAt,
+    commitEndAt,
+    endAt,
+    issuer.address,
+    issuer.publicKey.x,
+    issuer.publicKey.y
+  );
   await contract.waitForDeployment();
   const contractAddress = await contract.getAddress();
 
   console.log("Deploy:", contractAddress);
-  console.log("Issuer (credential authority):", issuer.address);
+  console.log("Issuer public key X:", issuer.publicKeyHex.x);
+  console.log("Issuer public key Y:", issuer.publicKeyHex.y);
+  console.log("Issuer (derived address):", issuer.address);
 
   const plan = voters.map((signer, idx) => ({
     signer,
@@ -42,37 +60,36 @@ async function main() {
     const salt = ethers.hexlify(ethers.randomBytes(32));
     const credentialSecret = ethers.hexlify(ethers.randomBytes(32));
     const credentialHash = ethers.keccak256(credentialSecret);
-    const blindingFactor = ethers.hexlify(ethers.randomBytes(32));
-    const credentialBlind = ethers.solidityPackedKeccak256(
-      ["bytes32", "bytes32"],
-      [credentialHash, blindingFactor]
-    );
+
+    const {
+      signatureStruct,
+      challengeHex,
+      blindedMessageHex,
+      blindSignatureHex
+    } = issueBlindCredential(credentialHash, ethers, issuer);
+
     const commitment = ethers.solidityPackedKeccak256(
       ["bytes32", "uint8", "bytes32"],
       [credentialHash, entry.optionIndex, salt]
     );
-    const msgHash = ethers.solidityPackedKeccak256(
-      ["string", "bytes32"],
-      ["SimpleVoting:", credentialHash]
-    );
-    const blindMsgHash = ethers.solidityPackedKeccak256(
-      ["string", "bytes32"],
-      ["SimpleVoting:Blind", credentialBlind]
-    );
-    const signature = await issuer.signMessage(ethers.getBytes(msgHash));
-    const blindSignature = await issuer.signMessage(ethers.getBytes(blindMsgHash));
 
-    const commitTx = await contract.connect(voter).commitVote(credentialHash, commitment, signature);
+    const commitTx = await contract.connect(voter).commitVote(credentialHash, commitment, signatureStruct);
     const commitReceipt = await commitTx.wait();
+
+    const accepted = await contract.verifyCredential(credentialHash, signatureStruct);
+    if (!accepted) {
+      throw new Error(`Credential signature rejected for ${credentialHash}`);
+    }
 
     entry.salt = salt;
     entry.commitment = commitment;
     entry.credentialSecret = credentialSecret;
     entry.credentialHash = credentialHash;
-    entry.credentialSignature = signature;
-    entry.blindingFactor = blindingFactor;
-    entry.credentialBlind = credentialBlind;
-    entry.credentialBlindSignature = blindSignature;
+    entry.signature = signatureStruct;
+    entry.signatureHex = signatureStructToHex(signatureStruct);
+    entry.challenge = challengeHex;
+    entry.blindedMessage = blindedMessageHex;
+    entry.sBlind = blindSignatureHex;
     entry.commitTx = commitReceipt.hash;
     entry.commitCaller = voter.address;
 
@@ -99,10 +116,10 @@ async function main() {
       commitTx: entry.commitTx,
       revealTx: revealReceipt.hash,
       credentialSecret: entry.credentialSecret,
-      credentialSignature: entry.credentialSignature,
-      credentialBlind: entry.credentialBlind,
-      credentialBlindSignature: entry.credentialBlindSignature,
-      blindingFactor: entry.blindingFactor,
+      blindSignature: entry.signatureHex,
+      blindedMessage: entry.blindedMessage,
+      blindSignatureRaw: entry.sBlind,
+      challenge: entry.challenge,
       salt: entry.salt,
       credentialDigest
     });
@@ -129,6 +146,14 @@ async function main() {
       {
         generatedAt: new Date().toISOString(),
         contractAddress,
+        issuer: {
+          address: issuer.address,
+          privateKey: issuer.privateKey,
+          publicKey: {
+            x: issuer.publicKeyHex.x,
+            y: issuer.publicKeyHex.y
+          }
+        },
         network: {
           chainId: Number(networkInfo.chainId),
           name: networkInfo.name
