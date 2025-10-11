@@ -86,17 +86,13 @@ export async function runSimulation(simulation, env) {
     const signature = await issuer.signMessage(ethers.getBytes(msgHash));
 
     const commitTx = await contract.connect(voter).commitVote(credentialHash, commitment, signature);
-    const commitReceipt = await commitTx.wait();
+    await commitTx.wait();
 
     entry.salt = salt;
     entry.commitment = commitment;
-    entry.credentialSecret = credentialSecret;
     entry.credentialHash = credentialHash;
-    entry.credentialSignature = signature;
-    entry.commitTx = commitReceipt.hash;
-    entry.commitCaller = voterAddress;
 
-    console.log(`Commit credential ${credentialHash} -> option ${entry.optionIndex} (conta ${voterAddress})`);
+    console.log(`Commit credential ${credentialHash} (conta ${voterAddress})`);
   }
 
   await moveToTimestamp(provider, commitEndAt + 1, { phase: "reveal", label });
@@ -105,33 +101,15 @@ export async function runSimulation(simulation, env) {
     const voter = entry.signer;
     const revealAddress = entry.accountAddress ?? (typeof voter.address === "string" ? voter.address : await voter.getAddress());
     const revealTx = await contract.connect(voter).revealVote(entry.credentialHash, entry.optionIndex, entry.salt);
-    const revealReceipt = await revealTx.wait();
+    await revealTx.wait();
 
-    const credentialDigest = await contract.credentialDigest(entry.credentialHash);
-    entry.revealCaller = revealAddress;
-
+    // Registro minimizado para privacidade: apenas associacao entre tokens
     voteRecords.push({
-      simulationId: simulation.id ?? null,
-      pauta: simulation.name ?? label,
-      label: entry.label,
-      accountIndex: entry.accountIndex,
-      accountAddress: entry.accountAddress,
-      voteToken: entry.commitment,
       voterToken: entry.credentialHash,
-      voto: simulation.options[entry.optionIndex],
-      start: startISO,
-      end: endISO,
-      commitTx: entry.commitTx,
-      commitCaller: entry.commitCaller ?? entry.accountAddress,
-      revealTx: revealReceipt.hash,
-      revealCaller: entry.revealCaller ?? entry.accountAddress,
-      credentialSecret: entry.credentialSecret,
-      credentialSignature: entry.credentialSignature,
-      salt: entry.salt,
-      credentialDigest,
+      voteToken: entry.commitment,
     });
 
-    console.log(`Reveal credential ${entry.credentialHash} -> option ${entry.optionIndex} (conta ${revealAddress})`);
+    console.log(`Reveal credential ${entry.credentialHash} (conta ${revealAddress})`);
   }
 
   const metadata = await contract.metadata();
@@ -165,7 +143,6 @@ export async function runSimulation(simulation, env) {
             options: simulation.options,
             timing,
             issuerIndex,
-            votes: simulation.votes,
           },
         },
         contractAddress,
@@ -207,4 +184,3 @@ export async function runSimulation(simulation, env) {
 
   return { id: simulation.id ?? label, name: simulation.name ?? label, outputPath };
 }
-
