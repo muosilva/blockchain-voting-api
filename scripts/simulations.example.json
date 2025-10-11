@@ -1,0 +1,38 @@
+{
+  "defaults": {
+    "issuerIndex": 0,
+    "voterOffset": 1,
+    "resetStateBetweenSimulations": true,
+    "timing": {
+      "startDelay": 5,
+      "commitDuration": 60,
+      "revealDuration": 60
+    }
+  },
+  "simulations": [
+    {
+      "id": "exemplo-basico",
+      "name": "TITULO GENERICO DA PAUTA",
+      "description": "Descricao curta e generica da pauta/assunto",
+      "options": [
+        "Opcao A",
+        "Opcao B"
+      ],
+      "votes": [
+        { "label": "Eleitor 1", "optionIndex": 0 },
+        { "label": "Eleitor 2", "optionIndex": 1 },
+        { "label": "Eleitor 3", "optionIndex": 0 }
+      ],
+      "issuerIndex": 0,
+      "output": {
+        "file": "cache/simulate-result-exemplo.json"
+      },
+      "timing": {
+        "startDelay": 5,
+        "commitDuration": 60,
+        "revealDuration": 60
+      }
+    }
+  ]
+}
+
