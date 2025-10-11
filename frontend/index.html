@@ -1,740 +1,571 @@
 ﻿<!doctype html>
 <html lang="pt-BR">
   <head>
-    <meta charset="utf-8">
-    <title>Permissioned Voting Dashboard</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Votações — Visualizador</title>
+    <meta name="color-scheme" content="dark light">
     <style>
-      :root {
-        color-scheme: light dark;
-        font-family: "Segoe UI", system-ui, sans-serif;
+      :root{
+        --bg: #0b0f14;
+        --panel: #121922;
+        --muted: #97a3b6;
+        --text: #e6eefc;
+        --green: #3ddc97;
+        --yellow: #ffd166;
+        --red: #ff6b6b;
+        --blue: #76a9fa;
+        --purple: #b794f4;
+        --badge: #1f2a37;
+        --card: #0f1620;
+        --shadow: 0 8px 24px rgba(0,0,0,.35);
+        --border: #1f2a37;
+        --input: #0c131d;
+        --focus: #2a4365;
       }
-      body {
-        margin: 0;
-        background: #f7f7f7;
-        color: #1c1c1c;
+      *{ box-sizing: border-box }
+      html, body{ height:100% }
+      body{
+        margin:0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+        background:
+          radial-gradient(1200px 600px at 10% -10%, rgba(118,169,250,.06), transparent),
+          radial-gradient(1000px 500px at 110% 10%, rgba(185,148,255,.06), transparent),
+          var(--bg);
+        color: var(--text);
+        overflow-x: hidden; /* nunca ultrapassar viewport */
       }
-      main {
-        max-width: 1100px;
-        margin: 0 auto;
-        padding: 2rem 1.5rem 4rem;
+      :focus-visible{
+        outline: 2px solid var(--focus);
+        outline-offset: 2px;
+        border-radius: 8px;
       }
-      h1 {
-        font-size: 1.9rem;
-        margin-bottom: 0.5rem;
+      header{
+        position: sticky; top:0; z-index: 10;
+        backdrop-filter: blur(8px);
+        background: linear-gradient(180deg, rgba(15,22,32,.9), rgba(15,22,32,.6));
+        border-bottom: 1px solid var(--border);
       }
-      h2 {
-        margin-top: 2.5rem;
-        font-size: 1.3rem;
-        border-bottom: 1px solid #d0d0d0;
-        padding-bottom: 0.35rem;
+      .wrap{ max-width: 1100px; margin:0 auto; padding: 14px 20px }
+      .row{ display:flex; gap:12px; flex-wrap:wrap; align-items:center }
+      h1{ margin:0; font-size:1.15rem; letter-spacing:.3px }
+      .pill{
+        display:inline-flex; align-items:center; gap:8px;
+        padding:6px 10px; border:1px solid var(--border); border-radius: 999px;
+        color: var(--muted); font-size:.85rem
       }
-      section {
-        margin-top: 1.75rem;
-        background: #ffffff;
-        padding: 1.5rem;
-        border-radius: 12px;
-        box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+      .pill strong{ color: var(--text) }
+
+      main{ max-width:1100px; margin:18px auto; padding:0 20px 40px }
+      .panels{ display:grid; grid-template-columns: 1fr 320px; gap:16px }
+      @media (max-width:980px){ .panels{ grid-template-columns:1fr } }
+
+      .panel{
+        background: var(--panel); border:1px solid var(--border);
+        border-radius:14px; box-shadow: var(--shadow)
       }
-      button, input, select, textarea {
-        font: inherit;
+      .panel > .head{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; border-bottom:1px solid var(--border) }
+      .panel > .head h2{ margin:0; font-size:1rem }
+      .panel .content{ padding: 12px 14px }
+
+      .toolbar{ display:flex; gap:10px; flex-wrap:wrap }
+      input[type="search"], select, input[type="text"], textarea{
+        background: var(--input); border:1px solid var(--border); color: var(--text);
+        padding:10px 12px; border-radius:10px; outline:none;
       }
-      button {
-        cursor: pointer;
-        padding: 0.6rem 1.2rem;
-        border-radius: 6px;
-        border: 1px solid #304ffe;
-        background: #304ffe;
-        color: #ffffff;
+      input[type="search"]{ min-width:220px }
+      button{
+        background: var(--input); border:1px solid var(--border); color:var(--text); cursor:pointer;
+        padding:10px 14px; border-radius:10px; transition: transform .06s ease-in-out, background .2s;
       }
-      button.secondary {
-        background: #ffffff;
-        color: #304ffe;
+      button:hover{ background:#0e1724 }
+      button:active{ transform: translateY(1px) }
+
+      .badge{ display:inline-flex; align-items:center; gap:6px; font-size:.78rem; background:var(--badge); padding:6px 10px; border-radius:999px; border:1px solid #233247; color:var(--muted) }
+      .dot{ width:8px; height:8px; border-radius:50% }
+      .dot.green{ background:var(--green) }
+      .dot.yellow{ background:var(--yellow) }
+      .dot.red{ background:var(--red) }
+      .dot.blue{ background:var(--blue) }
+
+      .list{ display:grid; gap:12px }
+      .card{ border:1px solid var(--border); background:linear-gradient(180deg, var(--card), #0b1118); border-radius:14px; padding:14px; box-shadow:var(--shadow) }
+      .card .top{ display:flex; justify-content:space-between; gap:10px; align-items:center; flex-wrap:wrap }
+      .card h3{ margin:0; font-size:1rem }
+      .meta{ font-size:.85rem; color:var(--muted) }
+      .grid{ display:grid; gap:12px }
+      .grid.cols-2{ grid-template-columns: 1fr 1fr }
+      @media (max-width:760px){ .grid.cols-2{ grid-template-columns:1fr } }
+
+      .progress{ height:10px; background:var(--input); border:1px solid var(--border); border-radius:999px; overflow:hidden }
+      .progress > div{ height:100% }
+
+      details{ background:var(--input); border:1px solid var(--border); border-radius:12px }
+      details>summary{
+        cursor:pointer; list-style:none; padding:10px 12px; user-select:none; color:var(--text);
       }
-      button:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
+      details>summary::-webkit-details-marker{ display:none }
+      details .inner{
+        padding:10px 12px; border-top:1px dashed var(--border);
+        overflow-x:auto; max-width:100%;
       }
-      label {
-        display: block;
-        font-size: 0.9rem;
-        margin-bottom: 0.25rem;
-        font-weight: 600;
+
+      .table{ width:100%; border-collapse:collapse; font-size:.9rem; table-layout:fixed; }
+      .table th, .table td{
+        padding:10px 12px; border-bottom:1px solid var(--border); text-align:left; vertical-align:middle;
+        overflow:hidden;
       }
-      input[type="text"], input[type="number"], textarea {
-        width: 100%;
-        padding: 0.6rem;
-        border: 1px solid #c6c6c6;
-        border-radius: 6px;
-        margin-bottom: 0.85rem;
-        background: #fafafa;
+      .table tbody tr:nth-child(odd){ background: rgba(255,255,255,0.02) }
+      .table tbody tr:hover{ background: rgba(118,169,250,0.07) }
+      .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace }
+
+      /* célula combinada de tokens */
+      td.tokencell{ min-width:0 }
+      .tokencell .line{
+        display:grid;
+        grid-template-columns: auto minmax(0,1fr) auto; /* [label] [hash…] [copy] */
+        align-items:center;
+        gap:8px;
+        margin:4px 0;
       }
-      input[type="text"]:focus, input[type="number"]:focus, textarea:focus {
-        outline: 2px solid rgba(48,79,254,0.35);
-        background: #ffffff;
+      .tokencell .label{
+        font-size:.78rem; color:var(--muted);
+        padding:2px 6px; border:1px solid var(--border); border-radius:999px; background:var(--input)
       }
-      .row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 1rem;
+      .tokencell .hash{
+        display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;
       }
-      .row > div {
-        flex: 1;
-        min-width: 240px;
+
+      .btn-copy{ font-size:.85rem; padding:2px 6px; border-radius:8px; border:1px solid var(--border); background:var(--input); color:var(--text); cursor:pointer; line-height:1 }
+      .btn-copy:hover{ background:#0e1724 }
+
+      .hint{ font-size:.85rem; color:var(--muted) }
+      .empty{ padding:18px; text-align:center; color:var(--muted) }
+      .toast{
+        position:fixed; right:16px; bottom:16px; background:var(--input); color:var(--text);
+        border:1px solid var(--border); padding:10px 12px; border-radius:10px; box-shadow:var(--shadow); opacity:.98
       }
-      .muted {
-        color: #666666;
-        font-size: 0.9rem;
-      }
-      .status {
-        display: flex;
-        gap: 0.75rem;
-        flex-wrap: wrap;
-        margin-top: 1rem;
-      }
-      .pill {
-        padding: 0.4rem 0.75rem;
-        border-radius: 999px;
-        font-size: 0.85rem;
-        background: #e8eaf6;
-        color: #1c1c1c;
-      }
-      .pill.danger {
-        background: #ffebee;
-        color: #c62828;
-      }
-      .pill.success {
-        background: #e8f5e9;
-        color: #1b5e20;
-      }
-      .grid {
-        display: grid;
-        gap: 0.75rem;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 0.95rem;
-        margin-top: 1rem;
-      }
-      th, td {
-        border-bottom: 1px solid #e2e2e2;
-        padding: 0.6rem;
-        text-align: left;
-      }
-      tbody tr:last-child td {
-        border-bottom: none;
-      }
-      code {
-        font-family: "Fira Code", "Consolas", monospace;
-        font-size: 0.85rem;
-        word-break: break-all;
-      }
-      .warning {
-        color: #c62828;
-        font-size: 0.95rem;
-        margin-top: 0.5rem;
-      }
-      ul {
-        padding-left: 1.1rem;
-      }
-      @media (prefers-color-scheme: dark) {
-        body { background: #111; color: #f5f5f5; }
-        section { background: #1d1d1d; box-shadow: 0 6px 20px rgba(0,0,0,0.4); }
-        input[type="text"], input[type="number"], textarea { background: #161616; border-color: #333; color: #f5f5f5; }
-        th, td { border-bottom: 1px solid #2a2a2a; }
-        .pill { background: #283593; color: #e8eaf6; }
-        .pill.danger { background: #5c1f21; color: #ffcdd2; }
-        .pill.success { background: #1b5e20; color: #c8e6c9; }
+
+      @media (prefers-reduced-motion: reduce){
+        *{ animation: none !important; transition: none !important }
       }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js" integrity="sha384-kjTQnn9xBD99jo/61BiBc8Z/zHT6v8DuyP+zF4jiSaKiyOMzt0c9WXiW6h3ObQWQ" crossorigin="anonymous"></script>
   </head>
   <body>
+    <header>
+      <div class="wrap row" role="navigation" aria-label="Barra superior">
+        <h1>📊 Votações — Visualizador</h1>
+        <span id="lastUpdate" class="pill" aria-live="polite">Atualizado: <strong>–</strong></span>
+        <span id="sourceCount" class="pill">Fontes: <strong>0</strong></span>
+      </div>
+    </header>
+
     <main>
-      <h1>Commit-Reveal Voting Dashboard</h1>
-      <p class="muted">Secure the permissioned PoS vote flow, validate credentials, and drive commits/reveals straight from the browser.</p>
-
-      <section id="connection">
-        <h2>Connection</h2>
-        <div class="row">
-          <div>
-            <label for="contractAddress">Contract address</label>
-            <input id="contractAddress" type="text" placeholder="0x..." autocomplete="off">
-            <button id="loadContract">Load contract</button>
-          </div>
-          <div>
-            <label>&nbsp;</label>
-            <button id="connectWallet" class="secondary">Connect wallet</button>
-            <div id="connectionStatus" class="status"></div>
-          </div>
-        </div>
-        <p id="cacheHint" class="muted"></p>
-      </section>
-
-      <section id="metadata">
-        <h2>Election metadata</h2>
-        <div id="metadataContent" class="grid muted">No contract selected yet.</div>
-      </section>
-
-      <section id="options">
-        <h2>Options and tally</h2>
-        <div id="optionsContent" class="grid muted">Load a contract to see the current tally.</div>
-      </section>
-
-      <section id="credentialTools">
-        <h2>Credential safety tools</h2>
-        <form id="credentialCheckForm">
-          <label for="credHash">Credential hash (bytes32)</label>
-          <input id="credHash" type="text" placeholder="0x..." autocomplete="off" required>
-
-          <label for="credSignature">Credential signature (issuer signed message)</label>
-          <textarea id="credSignature" rows="3" placeholder="0x..." required></textarea>
-
-          <button type="submit">Verify credential</button>
-        </form>
-        <div id="credentialCheckResult" class="status"></div>
-      </section>
-
-      <section id="commitTools">
-        <h2>Commit vote</h2>
-        <form id="commitForm">
-          <div class="row">
-            <div>
-              <label for="commitCredentialHash">Credential hash (bytes32)</label>
-              <input id="commitCredentialHash" type="text" placeholder="0x..." required>
-            </div>
-            <div>
-              <label for="commitOptionIndex">Option index</label>
-              <input id="commitOptionIndex" type="number" min="0" step="1" placeholder="0" required>
+      <div class="panels">
+        <!-- PAINEL PRINCIPAL -->
+        <section class="panel" aria-labelledby="lbl-pautas">
+          <div class="head">
+            <h2 id="lbl-pautas">Pautas</h2>
+            <div class="toolbar" role="group" aria-label="Ferramentas de filtro e atualização">
+              <input id="q" type="search" placeholder="Buscar por nome da pauta ou opção…" aria-label="Buscar" />
+              <label for="statusFilter" class="visually-hidden" style="position:absolute;left:-10000px">Status</label>
+              <select id="statusFilter" title="Filtrar por status" aria-label="Filtrar por status">
+                <option value="all">Todas</option>
+                <option value="running">Em andamento</option>
+                <option value="finalized">Finalizadas</option>
+                <option value="scheduled">Agendadas</option>
+              </select>
+              <button id="refreshBtn" aria-label="Atualizar agora">Atualizar</button>
+              <button id="autoBtn" aria-pressed="false" aria-label="Alternar atualização automática a cada 10 segundos">Auto (10s)</button>
             </div>
           </div>
 
-          <div class="row">
+          <div class="content">
+            <div class="row" style="margin-bottom:10px">
+              <span class="badge"><span class="dot blue" aria-hidden="true"></span> Agendada</span>
+              <span class="badge"><span class="dot yellow" aria-hidden="true"></span> Em andamento</span>
+              <span class="badge"><span class="dot green" aria-hidden="true"></span> Finalizada</span>
+            </div>
+            <div id="list" class="list" role="region" aria-live="polite"></div>
+          </div>
+        </section>
+
+        <!-- PAINEL DE FONTES -->
+        <aside class="panel" aria-labelledby="lbl-fontes">
+          <div class="head"><h2 id="lbl-fontes">Fontes de dados</h2></div>
+          <div class="content grid">
             <div>
-              <label for="commitSalt">Salt (bytes32)</label>
-              <input id="commitSalt" type="text" placeholder="0x..." required>
-              <button id="generateSalt" type="button" class="secondary">Generate random salt</button>
+              <label class="hint" for="sources">Arquivos cache a ler (um por linha)</label>
+              <textarea id="sources" rows="9" placeholder="/cache/simulate-result.json
+/cache/simulate-condominio.json
+/cache/simulate-assembleia-garagem.json"></textarea>
+              <div class="hint">Dica: adicione qualquer outro .json que o simulador gerar.</div>
             </div>
             <div>
-              <label for="commitSignature">Issuer signature</label>
-              <textarea id="commitSignature" rows="3" placeholder="0x..." required></textarea>
+              <label class="hint" for="quickUrl">Ou adicione uma URL rápida</label>
+              <div class="row">
+                <input id="quickUrl" type="text" placeholder="/cache/outro.json" />
+                <button id="addUrlBtn">Adicionar</button>
+              </div>
+              <hr style="border:none;border-top:1px solid var(--border);margin:14px 0"/>
+              <div class="hint">Formato esperado (flexível):</div>
+              <ul class="hint" style="margin-top:8px; padding-left:18px">
+                <li><code class="mono">{ pauta, generatedAt, votes:[{ pauta, voto, voteToken, voterToken, start, end }] }</code></li>
+                <li>ou vários objetos de pauta em um array: <code class="mono">[{ pauta, generatedAt, votes:[...] }, ...]</code></li>
+              </ul>
             </div>
           </div>
-
-          <label for="commitCommitment">Commitment hash (auto computed if empty)</label>
-          <input id="commitCommitment" type="text" placeholder="0x...">
-
-          <button type="submit">Send commit transaction</button>
-        </form>
-        <div id="commitResult" class="status"></div>
-      </section>
-
-      <section id="revealTools">
-        <h2>Reveal vote</h2>
-        <form id="revealForm">
-          <div class="row">
-            <div>
-              <label for="revealCredentialHash">Credential hash (bytes32)</label>
-              <input id="revealCredentialHash" type="text" placeholder="0x..." required>
-            </div>
-            <div>
-              <label for="revealOptionIndex">Option index</label>
-              <input id="revealOptionIndex" type="number" min="0" step="1" placeholder="0" required>
-            </div>
-          </div>
-
-          <label for="revealSalt">Salt (bytes32)</label>
-          <input id="revealSalt" type="text" placeholder="0x..." required>
-
-          <button type="submit">Send reveal transaction</button>
-        </form>
-        <div id="revealResult" class="status"></div>
-      </section>
-
-      <section id="simulation">
-        <h2>Latest local simulation snapshot</h2>
-        <div id="simulationContent" class="grid muted">Run <code>npm run simulate</code> to refresh the cache file.</div>
-      </section>
+        </aside>
+      </div>
     </main>
 
     <script type="module">
-      const { ethers } = window;
-      const ABI = [
-        "function VERSION() view returns (uint256)",
-        "function metadata() view returns (string name, address owner, address issuer, uint256 startAt, uint256 commitEndAt, uint256 endAt, uint8 phase, bool finalized, uint256 optionCount, uint256 totalVotes)",
-        "function optionDetails() view returns (string[] labels, uint256[] counts)",
-        "function leadingOption() view returns (uint256 index, uint256 votes, bool tie)",
-        "function isCommitPhase() view returns (bool)",
-        "function isRevealPhase() view returns (bool)",
-        "function verifyCredential(bytes32, bytes) view returns (bool)",
-        "function isCredentialRevoked(bytes32) view returns (bool)",
-        "function computeCommitment(bytes32, uint8, bytes32) pure returns (bytes32)",
-        "function commitVote(bytes32, bytes32, bytes)",
-        "function revealVote(bytes32, uint8, bytes32)",
-        "event Committed(bytes32 indexed commitment, uint256 timestamp)",
-        "event Voted(uint8 indexed option, uint256 timestamp)",
-        "event CredentialRevoked(bytes32 indexed credentialHash, uint256 timestamp)",
-        "event CredentialRestored(bytes32 indexed credentialHash, uint256 timestamp)"
+      // ---------- Utils ----------
+      const $  = (sel, el=document) => el.querySelector(sel);
+      const $$ = (sel, el=document) => Array.from(el.querySelectorAll(sel));
+
+      const listEl         = $('#list');
+      const lastUpdateEl   = $('#lastUpdate strong');
+      const sourceCountEl  = $('#sourceCount strong');
+      const qEl            = $('#q');
+      const statusFilterEl = $('#statusFilter');
+      const refreshBtn     = $('#refreshBtn');
+      const autoBtn        = $('#autoBtn');
+      const sourcesEl      = $('#sources');
+      const quickUrlEl     = $('#quickUrl');
+      const addUrlBtn      = $('#addUrlBtn');
+
+      const DEFAULT_SOURCES = [
+        '/cache/simulate-result.json',
+        '/cache/simulate-condominio.json',
+        '/cache/simulate-assembleia-garagem.json',
       ];
 
-      const state = {
-        cache: null,
-        provider: null,
-        signer: null,
-        contract: null,
-        reader: null,
-        contractAddress: null
-      };
+      let autoTimer = null;
+      let pautas = []; // [{name, generatedAt, start, end, votes:[...]}]
+      let qDebounce = 0;
 
-      const elements = {
-        contractAddress: document.querySelector('#contractAddress'),
-        loadContract: document.querySelector('#loadContract'),
-        connectWallet: document.querySelector('#connectWallet'),
-        connectionStatus: document.querySelector('#connectionStatus'),
-        cacheHint: document.querySelector('#cacheHint'),
-        metadataContent: document.querySelector('#metadataContent'),
-        optionsContent: document.querySelector('#optionsContent'),
-        simulationContent: document.querySelector('#simulationContent'),
-        credentialCheckForm: document.querySelector('#credentialCheckForm'),
-        credentialCheckResult: document.querySelector('#credentialCheckResult'),
-        commitForm: document.querySelector('#commitForm'),
-        commitResult: document.querySelector('#commitResult'),
-        revealForm: document.querySelector('#revealForm'),
-        revealResult: document.querySelector('#revealResult'),
-        generateSalt: document.querySelector('#generateSalt')
-      };
+      function toBRDate(ts){ try { return new Date(ts).toLocaleString('pt-BR'); } catch { return String(ts); } }
+      function asMillis(x){
+        if(x==null) return null;
+        const n = typeof x === 'string' ? Number(x) : x;
+        if(!Number.isFinite(n)) return null;
+        return n > 1e12 ? n : n*1000; // aceita segundos ou millis
+      }
+      function formatMaybeDate(x){
+        const m = asMillis(x);
+        if(m==null) return '—';
+        const d = new Date(m);
+        return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('pt-BR');
+      }
 
-      const formatTimestamp = (value) => {
-        if (!value) return 'n/a';
-        return new Date(Number(value) * 1000).toLocaleString('pt-BR');
-      };
+      // ---------- Normalização / Merge ----------
+      function normalizePayload(payload){
+        const arr = Array.isArray(payload) ? payload : [payload];
+        const out = [];
+        for(const item of arr){
+          if(!item) continue;
+          const name = item.pauta || item.name || 'Pauta';
+          const generatedAt = item.generatedAt || item.updatedAt || Date.now();
+          const votes = Array.isArray(item.votes) ? item.votes : [];
+          const startAt = item.startAt ?? item.commitStartAt ?? item.start ?? null;
+          const commitEndAt = item.commitEndAt ?? null;
+          const endAt = item.endAt ?? item.revealEndAt ?? item.end ?? null;
 
-      const short = (hash) => typeof hash === 'string' && hash.startsWith('0x') && hash.length > 12
-        ? `${hash.slice(0, 8)}...${hash.slice(-6)}`
-        : hash;
+          const starts = votes.map(v => Number(v.start)||0).filter(Boolean);
+          const ends   = votes.map(v => Number(v.end)||0).filter(Boolean);
+          const start  = asMillis(startAt) ?? (starts.length ? asMillis(Math.min(...starts)) : undefined);
+          const end    = asMillis(endAt)   ?? (ends.length   ? asMillis(Math.max(...ends))   : undefined);
 
-      const showStatus = (container, messages) => {
-        container.innerHTML = '';
-        messages.forEach(({ text, tone }) => {
-          const pill = document.createElement('span');
-          pill.className = `pill${tone ? ` ${tone}` : ''}`;
-          pill.textContent = text;
-          container.appendChild(pill);
-        });
-      };
-
-      const showMetadata = (metadata) => {
-        if (!metadata) {
-          elements.metadataContent.textContent = 'No data available.';
-          return;
+          out.push({ name, generatedAt, startAt: asMillis(startAt) ?? undefined, commitEndAt: asMillis(commitEndAt) ?? undefined, endAt: asMillis(endAt) ?? undefined, start, end, votes });
         }
-        const rows = [
-          `<div><strong>Name:</strong> ${metadata.name}</div>`,
-          `<div><strong>Owner:</strong> <code>${metadata.owner}</code></div>`,
-          `<div><strong>Issuer:</strong> <code>${metadata.issuer}</code></div>`,
-          `<div><strong>Start at:</strong> ${formatTimestamp(metadata.startAt)}</div>`,
-          `<div><strong>Commit closes:</strong> ${formatTimestamp(metadata.commitEndAt)}</div>`,
-          `<div><strong>Reveal closes:</strong> ${formatTimestamp(metadata.endAt)}</div>`,
-          `<div><strong>Phase:</strong> ${phaseLabel(metadata.phase)}</div>`,
-          `<div><strong>Commit window open:</strong> ${metadata.commitOpen ? 'yes' : 'no'}</div>`,
-          `<div><strong>Reveal window open:</strong> ${metadata.revealOpen ? 'yes' : 'no'}</div>`,
-          `<div><strong>Option count:</strong> ${metadata.optionCount}</div>`,
-          `<div><strong>Version:</strong> ${metadata.version ?? '?'} </div>`,
-          `<div><strong>Total votes:</strong> ${metadata.totalVotes}</div>`,
-          `<div><strong>Finalized:</strong> ${metadata.finalized ? 'yes' : 'no'}</div>`
-        ];
-        elements.metadataContent.innerHTML = rows.join('');
-      };
+        return out;
+      }
 
-      const phaseLabel = (value) => {
-        switch (Number(value)) {
-          case 0: return 'Not started';
-          case 1: return 'Commit';
-          case 2: return 'Reveal';
-          case 3: return 'Ended';
-          default: return `Unknown (${value})`;
-        }
-      };
-
-      const showOptions = (labels, counts, leading) => {
-        if (!labels || labels.length === 0) {
-          elements.optionsContent.textContent = 'No options registered.';
-          return;
-        }
-        const total = counts.reduce((acc, value) => acc + Number(value), 0);
-        const table = document.createElement('table');
-        table.innerHTML = `
-          <thead>
-            <tr><th>#</th><th>Label</th><th>Votes</th><th>Percent</th></tr>
-          </thead>
-          <tbody>
-            ${labels.map((label, index) => {
-              const votes = Number(counts[index]);
-              const percent = total > 0 ? ((votes / total) * 100).toFixed(1) : '0.0';
-              const mark = Number(leading.index) === index && !leading.tie ? '*' : '';
-              return `<tr><td>${index}</td><td>${label}</td><td>${votes}</td><td>${percent}% ${mark}</td></tr>`;
-            }).join('')}
-          </tbody>
-        `;
-        elements.optionsContent.innerHTML = '';
-        elements.optionsContent.appendChild(table);
-        if (leading.tie) {
-          const warning = document.createElement('div');
-          warning.className = 'warning';
-          warning.textContent = 'Warning: there is a tie for the lead.';
-          elements.optionsContent.appendChild(warning);
-        }
-      };
-
-      const refreshFromChain = async () => {
-        if (!state.reader) return;
-        try {
-          const [metadata, details, leading, commitOpen, revealOpen, version] = await Promise.all([
-            state.reader.metadata(),
-            state.reader.optionDetails(),
-            state.reader.leadingOption(),
-            state.reader.isCommitPhase(),
-            state.reader.isRevealPhase(),
-            state.reader.VERSION()
-          ]);
-          const [labels, counts] = details;
-          showMetadata({
-            name: metadata.name,
-            owner: metadata.owner,
-            issuer: metadata.issuer,
-            startAt: Number(metadata.startAt),
-            commitEndAt: Number(metadata.commitEndAt),
-            endAt: Number(metadata.endAt),
-            phase: Number(metadata.phase),
-            finalized: metadata.finalized,
-            optionCount: Number(metadata.optionCount),
-            totalVotes: Number(metadata.totalVotes),
-            commitOpen,
-            revealOpen,
-            version: Number(version)
+      function mergeByName(items){
+        const map = new Map();
+        for(const p of items){
+          const key = p.name;
+          const prev = map.get(key);
+          if(!prev){ map.set(key, { ...p }); continue; }
+          map.set(key, {
+            name: key,
+            generatedAt: Math.max(prev.generatedAt||0, p.generatedAt||0),
+            start: Math.min(prev.start||Infinity, p.start||Infinity),
+            end:   Math.max(prev.end||0,   p.end||0),
+            votes: [...(prev.votes||[]), ...(p.votes||[])],
+            startAt: prev.startAt ?? p.startAt,
+            endAt:   prev.endAt   ?? p.endAt,
+            commitEndAt: prev.commitEndAt ?? p.commitEndAt,
           });
-          showOptions(labels, counts, {
-            index: Number(leading.index),
-            votes: Number(leading.votes),
-            tie: leading.tie
-          });
-        } catch (error) {
-          console.error('Metadata refresh failed', error);
-          elements.metadataContent.textContent = 'Unable to fetch metadata. Please check the address and network.';
-          elements.optionsContent.textContent = '';
         }
-      };
+        return Array.from(map.values());
+      }
 
-      const connectReader = async (address) => {
-        if (!ethers.isAddress(address)) {
-          throw new Error('Invalid contract address');
+      function statusFor(p){
+        const now = Date.now();
+        if(p.end && now >= p.end) return { key:'finalized', label:'Finalizada', dot:'green' };
+        if(p.start && now < p.start) return { key:'scheduled', label:'Agendada', dot:'blue' };
+        return { key:'running', label:'Em andamento', dot:'yellow' };
+      }
+
+      function groupByOption(votes){
+        const map = new Map();
+        for(const v of votes){
+          const opt = String(v.voto ?? v.option ?? '—');
+          map.set(opt, (map.get(opt)||0) + 1);
         }
-        const provider = state.provider ?? new ethers.JsonRpcProvider();
-        state.reader = new ethers.Contract(address, ABI, provider);
-        state.contract = null;
-        state.contractAddress = address;
-        await refreshFromChain();
-        showStatus(elements.connectionStatus, [{ text: `Reader ready at ${short(address)}`, tone: 'success' }]);
-      };
+        const total = votes.length || 1;
+        return Array.from(map.entries()).map(([option, count]) => ({ option, count, pct: (count/total)*100 }));
+      }
 
-      const connectWallet = async () => {
-        if (!window.ethereum) {
-          showStatus(elements.connectionStatus, [{ text: 'No wallet detected', tone: 'danger' }]);
+      // ---------- Render ----------
+      function render(){
+        const q = qEl.value.trim().toLowerCase();
+        const statusFilter = statusFilterEl.value;
+        listEl.innerHTML = '';
+
+        const items = pautas
+          .map(p => ({ ...p, status: statusFor(p) }))
+          .filter(p => (
+            (statusFilter==='all' || p.status.key===statusFilter) &&
+            (q==='' || p.name.toLowerCase().includes(q) || p.votes.some(v => String(v.voto).toLowerCase().includes(q)))
+          ));
+
+        if(!items.length){
+          const empty = document.createElement('div');
+          empty.className = 'empty';
+          empty.textContent = 'Nenhuma pauta encontrada com o filtro atual.';
+          listEl.appendChild(empty);
           return;
         }
-        state.provider = new ethers.BrowserProvider(window.ethereum);
-        await state.provider.send('eth_requestAccounts', []);
-        state.signer = await state.provider.getSigner();
-        const network = await state.provider.getNetwork();
-        const signerAddress = await state.signer.getAddress();
-        const pills = [
-          { text: `Wallet ${short(signerAddress)}`, tone: 'success' },
-          { text: `Chain ${Number(network.chainId)} (${network.name})`, tone: '' }
-        ];
-        if (state.cache?.network?.chainId && Number(state.cache.network.chainId) !== Number(network.chainId)) {
-          pills.push({ text: 'Chain mismatch vs cache', tone: 'danger' });
-        }
-        showStatus(elements.connectionStatus, pills);
-        if (state.contractAddress) {
-          state.reader = new ethers.Contract(state.contractAddress, ABI, state.provider);
-          state.contract = state.reader.connect(state.signer);
-          await refreshFromChain();
-        }
-      };
 
-      const loadContract = async () => {
-        const address = elements.contractAddress.value.trim();
-        if (!address) {
-          showStatus(elements.connectionStatus, [{ text: 'Enter a contract address first', tone: 'danger' }]);
-          return;
-        }
-        try {
-          await connectReader(address);
-          if (state.signer) {
-            state.contract = state.reader.connect(state.signer);
+        for(const p of items){
+          const card = document.createElement('article');
+          card.className = 'card';
+
+          // topo
+          const top = document.createElement('div');
+          top.className = 'top';
+          const h3 = document.createElement('h3');
+          h3.textContent = p.name;
+          const badge = document.createElement('span');
+          badge.className = 'badge';
+          badge.innerHTML = `<span class="dot ${p.status.dot}"></span>${p.status.label}`;
+          top.appendChild(h3); top.appendChild(badge);
+
+          // meta
+          const meta = document.createElement('div');
+          meta.className = 'meta';
+          const startTxt = formatMaybeDate(p.startAt ?? p.start);
+          const endTxt   = formatMaybeDate(p.endAt ?? p.end);
+          meta.textContent = `Janela: ${startTxt} → ${endTxt} · Registros: ${p.votes.length} · Fonte: ${toBRDate(p.generatedAt)}`;
+
+          // grid
+          const grid = document.createElement('div');
+          grid.className = 'grid cols-2';
+
+          // esquerda: contagem
+          const left = document.createElement('div');
+          const tally = groupByOption(p.votes).sort((a,b)=>b.count-a.count);
+          if(!tally.length){
+            left.innerHTML = '<div class="hint">Sem votos.</div>';
+          } else {
+            for(const row of tally){
+              const label = document.createElement('div');
+              label.className = 'row';
+              label.style.justifyContent = 'space-between';
+              label.innerHTML = `<div class="mono">${row.option}</div><div>${row.count} (${row.pct.toFixed(1)}%)</div>`;
+              const bar = document.createElement('div');
+              bar.className = 'progress';
+              const fill = document.createElement('div');
+              fill.style.width = `${row.pct}%`;
+              fill.style.background = 'linear-gradient(90deg, var(--blue), var(--purple))';
+              bar.appendChild(fill);
+              left.appendChild(label);
+              left.appendChild(bar);
+            }
           }
-        } catch (error) {
-          console.error(error);
-          showStatus(elements.connectionStatus, [{ text: error.message ?? 'Failed to connect', tone: 'danger' }]);
-        }
-      };
 
-      const randomSalt = () => {
-        const buffer = new Uint8Array(32);
-        crypto.getRandomValues(buffer);
-        return ethers.hexlify(buffer);
-      };
-
-      elements.generateSalt.addEventListener('click', () => {
-        const input = document.querySelector('#commitSalt');
-        input.value = randomSalt();
-      });
-
-      elements.credentialCheckForm.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        if (!state.reader) {
-          showStatus(elements.credentialCheckResult, [{ text: 'Load a contract first', tone: 'danger' }]);
-          return;
-        }
-        const hash = document.querySelector('#credHash').value.trim();
-        const signature = document.querySelector('#credSignature').value.trim();
-        if (!ethers.isHexString(hash, 32)) {
-          showStatus(elements.credentialCheckResult, [{ text: 'Credential hash must be bytes32', tone: 'danger' }]);
-          return;
-        }
-        try {
-          const [valid, revoked] = await Promise.all([
-            state.reader.verifyCredential(hash, signature),
-            state.reader.isCredentialRevoked(hash)
-          ]);
-          const pills = [];
-          pills.push({ text: valid ? 'Signature valid' : 'Signature invalid', tone: valid ? 'success' : 'danger' });
-          pills.push({ text: revoked ? 'Revoked' : 'Active', tone: revoked ? 'danger' : 'success' });
-          showStatus(elements.credentialCheckResult, pills);
-        } catch (error) {
-          console.error(error);
-          showStatus(elements.credentialCheckResult, [{ text: error.message ?? 'Verification failed', tone: 'danger' }]);
-        }
-      });
-
-      elements.commitForm.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        if (!state.contract) {
-          showStatus(elements.commitResult, [{ text: 'Connect wallet and load contract', tone: 'danger' }]);
-          return;
-        }
-        const credentialHash = document.querySelector('#commitCredentialHash').value.trim();
-        const optionIndex = Number(document.querySelector('#commitOptionIndex').value.trim());
-        const salt = document.querySelector('#commitSalt').value.trim();
-        const signature = document.querySelector('#commitSignature').value.trim();
-        let commitment = document.querySelector('#commitCommitment').value.trim();
-
-        if (!ethers.isHexString(credentialHash, 32)) {
-          showStatus(elements.commitResult, [{ text: 'Credential hash must be bytes32', tone: 'danger' }]);
-          return;
-        }
-        if (!Number.isInteger(optionIndex) || optionIndex < 0) {
-          showStatus(elements.commitResult, [{ text: 'Option index must be a non-negative integer', tone: 'danger' }]);
-          return;
-        }
-        if (!ethers.isHexString(salt, 32)) {
-          showStatus(elements.commitResult, [{ text: 'Salt must be bytes32', tone: 'danger' }]);
-          return;
-        }
-        if (!commitment) {
-          try {
-            commitment = await state.reader.computeCommitment(credentialHash, optionIndex, salt);
-            document.querySelector('#commitCommitment').value = commitment;
-          } catch (error) {
-            console.error(error);
-            showStatus(elements.commitResult, [{ text: 'Could not compute commitment', tone: 'danger' }]);
-            return;
-          }
-        }
-        try {
-          const [revoked, signatureValid] = await Promise.all([
-            state.reader.isCredentialRevoked(credentialHash),
-            state.reader.verifyCredential(credentialHash, signature)
-          ]);
-          if (revoked) {
-            showStatus(elements.commitResult, [{ text: 'Credential revoked', tone: 'danger' }]);
-            return;
-          }
-          if (!signatureValid) {
-            showStatus(elements.commitResult, [{ text: 'Invalid issuer signature', tone: 'danger' }]);
-            return;
-          }
-          showStatus(elements.commitResult, [{ text: 'Submitting transaction...', tone: '' }]);
-          const tx = await state.contract.commitVote(credentialHash, commitment, signature);
-          const receipt = await tx.wait();
-          showStatus(elements.commitResult, [
-            { text: 'Commit confirmed', tone: 'success' },
-            { text: short(receipt.hash), tone: '' }
-          ]);
-          await refreshFromChain();
-        } catch (error) {
-          console.error(error);
-          showStatus(elements.commitResult, [{ text: error.shortMessage ?? error.message ?? 'Commit failed', tone: 'danger' }]);
-        }
-      });
-
-      elements.revealForm.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        if (!state.contract) {
-          showStatus(elements.revealResult, [{ text: 'Connect wallet and load contract', tone: 'danger' }]);
-          return;
-        }
-        const credentialHash = document.querySelector('#revealCredentialHash').value.trim();
-        const optionIndex = Number(document.querySelector('#revealOptionIndex').value.trim());
-        const salt = document.querySelector('#revealSalt').value.trim();
-
-        if (!ethers.isHexString(credentialHash, 32)) {
-          showStatus(elements.revealResult, [{ text: 'Credential hash must be bytes32', tone: 'danger' }]);
-          return;
-        }
-        if (!Number.isInteger(optionIndex) || optionIndex < 0) {
-          showStatus(elements.revealResult, [{ text: 'Option index must be a non-negative integer', tone: 'danger' }]);
-          return;
-        }
-        if (!ethers.isHexString(salt, 32)) {
-          showStatus(elements.revealResult, [{ text: 'Salt must be bytes32', tone: 'danger' }]);
-          return;
-        }
-        try {
-          showStatus(elements.revealResult, [{ text: 'Submitting transaction...', tone: '' }]);
-          const tx = await state.contract.revealVote(credentialHash, optionIndex, salt);
-          const receipt = await tx.wait();
-          showStatus(elements.revealResult, [
-            { text: 'Reveal confirmed', tone: 'success' },
-            { text: short(receipt.hash), tone: '' }
-          ]);
-          await refreshFromChain();
-        } catch (error) {
-          console.error(error);
-          showStatus(elements.revealResult, [{ text: error.shortMessage ?? error.message ?? 'Reveal failed', tone: 'danger' }]);
-        }
-      });
-
-      const loadCache = async () => {
-        try {
-          const response = await fetch('/cache/simulate-result.json', { cache: 'no-store' });
-          if (!response.ok) return;
-          const data = await response.json();
-          state.cache = data;
-          elements.cacheHint.innerHTML = `Cache loaded: contract ${short(data.contractAddress)} | generated ${new Date(data.generatedAt).toLocaleString('pt-BR')}`;
-          if (!elements.contractAddress.value) {
-            elements.contractAddress.value = data.contractAddress ?? '';
-          }
-          renderSimulation(data);
-        } catch (error) {
-          elements.cacheHint.textContent = 'No simulation cache found yet. Run npm run simulate to generate one.';
-        }
-      };
-
-      const renderSimulation = (data) => {
-        if (!data || !Array.isArray(data.votes) || data.votes.length === 0) {
-          elements.simulationContent.textContent = 'Simulation cache is empty. Run npm run simulate to refresh the data.';
-          return;
-        }
-        const list = document.createElement('div');
-        list.className = 'grid';
-        const header = document.createElement('div');
-        header.innerHTML = `
-          <strong>Snapshot:</strong> ${data.metadata?.name ?? data.pauta} - ${new Date(data.generatedAt).toLocaleString('pt-BR')}<br>
-          Contract: <code>${data.contractAddress}</code><br>
-          Issuer: <code>${data.metadata?.issuer ?? data.issuer}</code>
-        `;
-        list.appendChild(header);
-        data.votes.forEach((vote, index) => {
-          const card = document.createElement('div');
-          card.style.border = '1px solid #e0e0e0';
-          card.style.borderRadius = '8px';
-          card.style.padding = '0.75rem';
-          card.innerHTML = `
-            <div><strong>Vote #${index + 1}</strong></div>
-            <div>Commitment: <code>${vote.voteToken}</code></div>
-            <div>Credential: <code>${vote.voterToken}</code></div>
-            <div>Option: ${vote.voto}</div>
-            <div>Salt: <code>${vote.salt ?? 'hidden'}</code></div>
-            <div>Commit tx: <code>${vote.commitTx}</code></div>
-            <div>Reveal tx: <code>${vote.revealTx}</code></div>
+          // direita: horários
+          const right = document.createElement('div');
+          right.innerHTML = `
+            <div class="row" style="justify-content:space-between">
+              <div class="badge"><span class="dot blue"></span> Início: <span class="mono">${startTxt}</span></div>
+              <div class="badge"><span class="dot ${p.status.dot}"></span> Fim: <span class="mono">${endTxt}</span></div>
+            </div>
+            <div class="hint" style="margin-top:8px">Clique para ver detalhes individuais (tokens e carimbos de tempo).</div>
           `;
-          list.appendChild(card);
-        });
-        elements.simulationContent.innerHTML = '';
-        elements.simulationContent.appendChild(list);
-      };
+          grid.appendChild(left); grid.appendChild(right);
 
-      elements.connectWallet.addEventListener('click', connectWallet);
-      elements.loadContract.addEventListener('click', loadContract);
+          // detalhes
+          const details = document.createElement('details');
+          const summary = document.createElement('summary');
+          summary.textContent = 'Detalhar registros';
+          const inner = document.createElement('div');
+          inner.className = 'inner';
 
-      await loadCache();
-      if (state.cache?.contractAddress) {
-        try {
-          await connectReader(state.cache.contractAddress);
-        } catch (error) {
-          console.warn('Unable to auto connect to cached contract:', error.message);
-        }
-      }
-    </script>
-  </body>
-</html>
+          const table = document.createElement('table');
+          table.className = 'table';
+          table.innerHTML = `
+            <colgroup>
+              <col style="width:56px" />
+              <col style="width:120px" />
+              <col style="width:140px" />
+              <col /> <!-- tokens -->
+            </colgroup>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Opção</th>
+                <th>Token</th>
+                <th class="mono">Vote Token / Voter Token</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          `;
+          const tbody = $('tbody', table);
 
-<!doctype html>
-<html lang="pt-BR">
-  <head>
-    <meta charset="utf-8">
-    <title>Resultado da Votação - Simulação</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-      body { font-family: system-ui, sans-serif; margin: 2rem; background: #f7f7f7; color: #222; }
-      main { background: #fff; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-      h1 { margin-top: 0; }
-      .result-line { font-family: monospace; margin: 0.5rem 0; padding: 0.5rem; background: #f0f0f0; border-radius: 4px; word-break: break-all; }
-      .error { color: #b3261e; }
-      .meta { font-size: 0.9rem; color: #555; margin-bottom: 1rem; }
-    </style>
-  </head>
-  <body>
-    <main>
-      <h1>Resultado da Simulação</h1>
-      <p id="status" class="meta">Carregando dados...</p>
-      <div id="results"></div>
-    </main>
-
-    <script type="module">
-      const statusEl = document.querySelector('#status');
-      const resultsEl = document.querySelector('#results');
-
-      async function loadSimulation() {
-        try {
-          const response = await fetch('/cache/simulate-result.json', { cache: 'no-store' });
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          const data = await response.json();
-
-          if (!Array.isArray(data.votes) || data.votes.length === 0) {
-            statusEl.textContent = 'Nenhum voto encontrado. Execute `npm run simulate` após iniciar o nó local.';
-            return;
-          }
-
-          const header = `Última simulação gerada em ${new Date(data.generatedAt).toLocaleString('pt-BR')} para a pauta "${data.pauta}"`;
-          statusEl.textContent = header;
-
-          data.votes.forEach((vote) => {
-            const line = document.createElement('div');
-            line.className = 'result-line';
-            line.textContent = `${vote.pauta} | ${vote.voteToken} | ${vote.voterToken} | ${vote.voto} | ${vote.start} | ${vote.end}`;
-            resultsEl.appendChild(line);
+          p.votes.forEach((v, i) => {
+            const tr = document.createElement('tr');
+            const voteTok  = v.voteToken  ?? '—';
+            const voterTok = v.voterToken ?? '—';
+            const tokenVal = v.tokenId ?? v.token ?? '-';
+            tr.innerHTML = `
+              <td class="mono">${i+1}</td>
+              <td class="mono">${v.voto ?? v.option ?? '-'}</td>
+              <td class="mono">${tokenVal}</td>
+              <td class="mono tokencell">
+                <div class="line">
+                  <span class="label">vote</span>
+                  <span class="hash" title="${voteTok}">${voteTok}</span>
+                  <button class="btn-copy" data-copy="${voteTok}" title="Copiar vote token" aria-label="Copiar vote token">⧉</button>
+                </div>
+                <div class="line">
+                  <span class="label">voter</span>
+                  <span class="hash" title="${voterTok}">${voterTok}</span>
+                  <button class="btn-copy" data-copy="${voterTok}" title="Copiar voter token" aria-label="Copiar voter token">⧉</button>
+                </div>
+              </td>
+            `;
+            tbody.appendChild(tr);
           });
-        } catch (error) {
-          statusEl.textContent = 'Erro ao carregar dados da simulação. Confirme se o arquivo cache/simulate-result.json existe.';
-          statusEl.classList.add('error');
-          console.error(error);
+
+          inner.appendChild(table);
+          details.appendChild(summary);
+          details.appendChild(inner);
+
+          card.appendChild(top);
+          card.appendChild(meta);
+          card.appendChild(grid);
+          card.appendChild(details);
+          listEl.appendChild(card);
         }
       }
 
-      loadSimulation();
+      // ---------- Data I/O ----------
+      async function fetchJSON(url){
+        const res = await fetch(url, { cache:'no-store' });
+        if(!res.ok) throw new Error(`Falha ao ler ${url}: HTTP ${res.status}`);
+        return res.json();
+      }
+
+      async function load(){
+        const urls = sourcesEl.value
+          .split(/\n|\r/)
+          .map(s => s.trim())
+          .filter(Boolean);
+
+        const results = [];
+        let ok = 0;
+        for(const url of urls){
+          try{
+            const payload = await fetchJSON(url);
+            results.push(...normalizePayload(payload));
+            ok++;
+          }catch(err){
+            console.warn(err);
+          }
+        }
+        pautas = mergeByName(results);
+        render();
+        lastUpdateEl.textContent = toBRDate(Date.now());
+        sourceCountEl.textContent = String(ok);
+
+        // persistir fontes
+        try{ localStorage.setItem('voteviewer.sources', sourcesEl.value); }catch{}
+      }
+
+      // ---------- UX helpers ----------
+      function showToast(msg){
+        const t = document.createElement('div');
+        t.className = 'toast';
+        t.textContent = msg;
+        document.body.appendChild(t);
+        setTimeout(()=> t.remove(), 1600);
+      }
+
+      // Delegação global para copiar (funciona com elementos dinâmicos)
+      document.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.btn-copy');
+        if(!btn) return;
+        const text = btn.getAttribute('data-copy') || '';
+        if(!text) return;
+        try{
+          await navigator.clipboard.writeText(text);
+          showToast('Copiado!');
+        }catch{
+          showToast('Não foi possível copiar');
+        }
+      });
+
+      // ---------- Eventos ----------
+      refreshBtn.addEventListener('click', load);
+
+      qEl.addEventListener('input', () => {
+        clearTimeout(qDebounce);
+        qDebounce = setTimeout(render, 150);
+      });
+
+      statusFilterEl.addEventListener('change', render);
+
+      addUrlBtn.addEventListener('click', () => {
+        const url = quickUrlEl.value.trim();
+        if(!url) return;
+        const lines = sourcesEl.value.trim();
+        sourcesEl.value = [lines, url].filter(Boolean).join('\n');
+        quickUrlEl.value = '';
+        load();
+      });
+
+      autoBtn.addEventListener('click', () => {
+        const pressed = autoBtn.getAttribute('aria-pressed') === 'true';
+        if(pressed){
+          autoBtn.setAttribute('aria-pressed','false');
+          autoBtn.textContent = 'Auto (10s)';
+          if(autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+        } else {
+          autoBtn.setAttribute('aria-pressed','true');
+          autoBtn.textContent = 'Auto: ON (10s)';
+          if(autoTimer) clearInterval(autoTimer);
+          autoTimer = setInterval(load, 10000);
+        }
+      });
+
+      // ---------- Boot ----------
+      (function init(){
+        // restaurar fontes salvas
+        try{
+          const saved = localStorage.getItem('voteviewer.sources');
+          if(saved && saved.trim()){
+            sourcesEl.value = saved;
+          }
+        }catch{}
+        if(!sourcesEl.value.trim()){
+          sourcesEl.value = DEFAULT_SOURCES.join('\n');
+        }
+        load();
+      })();
     </script>
   </body>
 </html>

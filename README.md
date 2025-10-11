@@ -1,58 +1,57 @@
 # Blockchain Voting API
 
-Sistema de votação totalmente on-chain construído em Solidity com Hardhat, utilizando dois mecanismos clássicos de privacidade e auditabilidade:
+Sistema de votacao totalmente on-chain construido em Solidity com Hardhat. A arquitetura combina privacidade (via commit-reveal e blind signatures) com bilhetes ERC-721 transferiveis que controlam quem pode votar em cada pauta.
 
-- **Commit–Reveal**: primeiro você registra um compromisso criptográfico e associa ele ao seu voto; depois, em outra fase, revela o seu voto junto com o segredo que prova ser o dono daquela compromisso. Isso impede que alguém copie o voto antes da hora, como num concurso onde todos depositam envelopes em uma urna e só depois os abrem.
-- **Blind Signatures**: cada eleitor recebe uma credencial assinada pela autoridade, porém essa assinatura é emitida sem que a autoridade enxergue o conteúdo final (analogia do "papel carbono": o escrivão assina o envelope opaco, e você transfere a assinatura para a ficha escondida lá dentro). Assim garantimos que apenas eleitores autorizados participem, sem revelar quem recebeu qual credencial.
+- **Commit-Reveal**: primeiro o eleitor registra um compromisso criptografico; em uma janela posterior ele revela o voto junto com o segredo (salt) que prova a autoria. Nenhum voto pode ser lido antes da hora e copias nao valem.
+- **Blind Signatures**: a autoridade emite credenciais assinadas sem enxergar o conteudo final. Assim apenas eleitores autorizados participam, mas a identidade permanece separada da transacao on-chain.
+- **Voting Tickets (ERC-721)**: para cada pauta o administrador cunha um NFT (`TokenizedVoting.sol`). O detentor atual do token e quem pode chamar `commitVoteWithToken`. Transferir o NFT antes do commit move o direito de voto para outro usuario, mantendo peso fixo igual a 1.
 
-O contrato `SimpleVoting.sol` combina esses dois mecanismos: apenas quem apresenta uma credencial válida consegue registrar o commit, e somente após a janela de commit é possível revelar e contabilizar o voto. Nenhuma parte do processo liga o voto diretamente a um endereço Ethereum; tudo gira em torno de um token opaco derivado da credencial.
+## Visao Geral do Fluxo
 
-## Visão Geral do Fluxo
+1. **Preparacao (off-chain)**
+   - A autoridade embaralha/gera credenciais cegas para cada eleitor e assina cada hash.
+   - O eleitor guarda o par (credentialHash, signature) e um salt secreto.
 
-1. **Preparação (off-chain)**
-   - A autoridade emissora gera/sorteia credenciais cegas para cada eleitor e assina sem ver o conteúdo real.
-   - O eleitor guarda a sua credencial (nonce + assinatura).
+2. **Distribuicao de bilhetes (on-chain)**
+   - O administrador chama `mintVoteToken` (ou `mintVoteTokens`) e entrega um NFT para cada participante.
+   - Os bilhetes podem ser transferidos livremente ate o commit; o novo dono assume o direito de votar naquela pauta.
 
-2. **Commit (on-chain)**
-   - Dentro da janela `startAt → commitEndAt`, o eleitor calcula um compromisso `keccak256(credentialHash, optionIndex, salt)` e envia para `commitVote`, junto com a credencial e a assinatura da autoridade.
-   - O contrato verifica a assinatura contra o endereço do emissor, garante que aquela credencial ainda não foi usada e guarda apenas o compromisso.
+3. **Commit (on-chain)**
+   - Entre `startAt` e `commitEndAt`, o eleitor calcula `commitment = keccak256(credentialHash, optionIndex, salt)`.
+   - Ele chama `commitVoteWithToken(tokenId, credentialHash, commitment, signature)`.
+   - O contrato verifica a assinatura da autoridade, confere que o chamador e dono (ou aprovado) do token e armazena somente o hash do voto.
 
-3. **Reveal (on-chain)**
-   - Após `commitEndAt` e antes de `endAt`, o eleitor chama `revealVote(credentialHash, optionIndex, salt)`.
-   - O contrato recomputa o compromisso com base no token da credencial e, se corresponder, credita um voto para a opção informada.
+4. **Reveal (on-chain)**
+   - Entre `commitEndAt` e `endAt`, o eleitor chama `revealVote(credentialHash, optionIndex, salt)`.
+   - O contrato recomputa o compromisso, valida e incrementa o contador da opcao escolhida.
 
-4. **Finalização**
-   - Terminada a fase de reveal, qualquer conta pode chamar `finalize()` para emitir o evento `Finalized`, consolidando o resultado.
+5. **Finalizacao**
+   - Após `endAt`, qualquer conta pode chamar `finalize()` para emitir o evento `Finalized` com o resultado.
 
-### Metáfora resumida
-
-Imagine uma assembleia com envelopes lacrados e fichas carimbadas:
-
-- A secretaria distribui fichas carimbadas (blind signature) a quem tem direito a voto, mas não sabe qual ficha cada pessoa pegou.
-- Cada um escreve um código secreto na ficha, coloca num envelope e joga na urna antes de ela ser lacrada (commit).
-- Quando a urna é aberta na hora certa, o eleitor mostra apenas o código secreto — não o nome — e o envelope correspondente é identificado e contado (reveal).
+Metafora: a secretaria distribui fichas carimbadas (NFTs). O eleitor escreve o voto em um papel cifrado e lacra no envelope (commit). Na hora certa, mostra seu papel e o carimbo para validar e contar (reveal). Se vender ou repassar a ficha antes do commit, transfere junto o direito de votar.
 
 ## Estrutura do Projeto
 
 ```
 contracts/
-  SimpleVoting.sol     # Contrato principal com commit-reveal + credenciais blindadas
+  SimpleVoting.sol       # Nucleo commit-reveal + credenciais blindadas
+  TokenizedVoting.sol    # Extensao ERC-721 que torna o voto transferivel (peso 1)
 scripts/
-  deploy.js            # Deploy manual para uma rede configurada no Hardhat
-  simulate.js          # Executa uma simulação completa (commit + reveal) e gera dados para o frontend
+  deploy.js              # Deploy manual do TokenizedVoting em uma rede Hardhat configurada
+  simulate.js            # Simulacao completa (mint tickets + commit + reveal) e exporta dados para o frontend
 frontend/
-  index.html           # Página simples que lê cache/simulate-result.json e exibe os resultados
+  index.html             # Visualizador simples que le cache/simulate-result.json
 cache/
-  simulate-result.json # Gerado pela simulação; usado para o frontend demonstrar o processo
+  simulate-result.json   # Gerado pelo script de simulacao para fins de demonstracao
 ```
 
-## Pré-requisitos
+## Pre-requisitos
 
-- Node.js ≥ 18
+- Node.js >= 18
 - npm (incluso no Node)
-- Hardhat já está listado como dependência
+- Hardhat (listado em `devDependencies`)
 
-Instale as dependências:
+Instale dependencias:
 
 ```bash
 npm install
@@ -60,15 +59,15 @@ npm install
 
 ## Como Rodar
 
-### 1. Iniciar uma rede local
+### 1. Subir uma rede local
 
 ```bash
 npm run node
 ```
 
-Este comando abre um nó Hardhat com contas predefinidas. Mantenha o processo rodando em um terminal.
+Mantem um Hardhat Network com contas pre-carregadas.
 
-### 2. Executar a simulação end-to-end
+### 2. Rodar a simulacao end-to-end
 
 Em outro terminal:
 
@@ -76,65 +75,70 @@ Em outro terminal:
 npm run simulate
 ```
 
-O script faz o seguinte:
+O script:
 
-- faz o deploy do contrato `SimpleVoting` com datas relativas ao tempo atual;
-- usa a primeira conta do Hardhat como autoridade emissora que assina credenciais;
-- seleciona cinco contas como eleitores, gera commits com salts aleatórios, envia os commits, avança o tempo e realiza os reveals;
-- salva o arquivo `cache/simulate-result.json` com todos os hashes, transações e metadados.
+- faz deploy de `TokenizedVoting` com janelas relativas ao horario atual;
+- usa a primeira conta como autoridade emissora (issuer) e proprietario do contrato;
+- cunha um NFT (`mintVoteToken`) para cada um dos cinco eleitores ficticios;
+- cada eleitor gera salt/certificado aleatorio, envia `commitVoteWithToken`, avanca o tempo e executa o `reveal`;
+- grava `cache/simulate-result.json` com metadados da pauta, opcoes, hashes de transacao, tokenId utilizado e segredos.
 
-Você verá no console logs para cada `commit` e `reveal`, além do resumo final da votação.
+### 3. Visualizar no frontend demo
 
-### 3. Visualizar no frontend de demonstração
-
-Sirva o diretório do projeto (pode ser com qualquer servidor estático, por exemplo):
+Sirva o diretorio do projeto com um servidor estatico (exemplo):
 
 ```bash
 npx http-server .
 ```
 
-Acesse `http://localhost:8080/frontend/index.html` (ajuste a porta/conjunto conforme o servidor escolhido). A página carrega `cache/simulate-result.json` e mostra:
+Acesse `http://localhost:8080/frontend/index.html`. A pagina carrega o JSON da simulacao e exibe:
 
-- pauta e carimbo de geração;
-- endereço da autoridade emissora;
-- horários de término da fase de commit e reveal;
-- para cada eleitor: hash do compromisso (`voteToken`), hash da credencial (`voterToken`), opção revelada e hashes das transações de commit/reveal.
+- titulo da pauta, fases e timestamps;
+- endereco do emissor e do contrato;
+- lista de votos com `tokenId`, commitment e credencial (hashes);
+- status de cada pauta (janela de commit/reveal e vencedor).
 
-> Importante: sempre rode `npm run simulate` depois de iniciar o nó local para gerar um arquivo de resultados atualizado.
+> Rode `npm run simulate` sempre que quiser gerar dados atualizados.
 
 ## Deploy manual (opcional)
-
-Caso queira fazer o deploy manual em outra rede Hardhat configurada, use:
 
 ```bash
 npm run deploy:local
 ```
 
-Ajuste `scripts/deploy.js` ou as configurações de rede no `hardhat.config.js` conforme sua necessidade.
+O script realiza o deploy de `TokenizedVoting` na rede `localhost`. Ajuste datas, URI base ou distribuicao de bilhetes conforme sua necessidade.
 
-## Detalhes Técnicos do Contrato
+## Detalhes dos Contratos
 
-- Guarda o dono (`owner`) e a autoridade (`issuer`) que assina as credenciais.
-- `commitVote(bytes32 credentialHash, bytes32 commitment, bytes signature)`
-  - valida fase e formato do token;
-  - verifica a assinatura da autoridade sobre `credentialHash`;
-  - armazena o compromisso associado ao token opaco.
-- `revealVote(bytes32 credentialHash, uint8 optionIndex, bytes32 salt)`
-  - aceita apenas na janela de reveal;
-  - recomputa `keccak256(credentialHash, optionIndex, salt)` para conferir o compromisso;
-  - incrementa o contador sem revelar nenhum endereço.
-- `ballotOf(bytes32 credentialHash)` retorna o compromisso e se ele já foi revelado, auxiliando auditorias.
+### SimpleVoting.sol
+
+- `commitVote(bytes32 credentialHash, bytes32 commitment, bytes signature)`  
+  Valida a assinatura da autoridade, verifica janelas e registra o compromisso. Na implementacao base o peso de cada voto e 1.
+- `revealVote(bytes32 credentialHash, uint8 optionIndex, bytes32 salt)`  
+  Recalcula o hash, confere e incrementa o contador da opcao escolhida.
+- `revokeCredential` / `restoreCredential`  
+  Permite invalidar credenciais nao utilizadas caso o emissor detecte abuso.
+- `metadata()`, `optionDetails()`, `ballotOf()`  
+  Funcoes auxiliares para auditoria e integraches off-chain.
+
+### TokenizedVoting.sol
+
+- `mintVoteToken(address to)` e `mintVoteTokens(address[] to)`  
+  Cunha NFTs transferiveis (peso 1) para cada eleitor autorizado.
+- `commitVoteWithToken(uint256 tokenId, bytes32 credentialHash, bytes32 commitment, bytes signature)`  
+  Combina a verificacao do token ERC-721 (dono ou operador aprovado) com a logica de credencial cega do `SimpleVoting`.
+- `tokenUsed(uint256 tokenId)`  
+  Indica se o bilhete ja teve commit registrado (evita reuso).
+- `setBaseTokenURI(string)`  
+  Atualiza o prefixo utilizado em metadados das NFTs.
 
 ## Perguntas Frequentes
 
-**Por que usar blind signatures se já existe o commit–reveal?**
+**Por que manter blind signatures se o direito de voto ja depende de um NFT?**  
+Porque o NFT apenas autoriza quem pode votar; o commit-reveal continua garantindo sigilo do voto. A credencial cega impede que o administrador relacione token (ou endereco) ao conteudo do voto revelado.
 
-> O commit–reveal impede que o voto seja lido antes da hora, mas, sozinho, ele ainda exige que o contrato saiba quem está autorizando o commit. As blind signatures permitem que a autoridade distribua credenciais sem amarrá-las publicamente a um eleitor específico, conciliando controle de acesso e privacidade.
+**Posso transferir o NFT depois do commit?**  
+Sim, mas o bilhete marcado como usado nao permite novo commit. Transferencias antes do commit movem o direito de voto; depois do commit servem apenas como registro historico.
 
-**Onde ocorre a parte "cega" da assinatura?**
-
-> Sempre fora da blockchain. O contrato só recebe a assinatura já descegada (o eleitor faz isso localmente) e valida com a chave pública da autoridade.
-
-**Como adapto para produção?**
-
-> Troque o script de simulação por fluxos reais: geração de credenciais off-chain, distribuição segura aos eleitores, interface web/mobile que prepare o commit e realize o reveal no tempo certo. Considere também adicionar mecanismos de registro extra e provas de inclusão/exclusão conforme o caso de uso.
+**Como adapto para producao?**  
+Substitua a simulacao por processos reais: distribuicao segura dos NFTs, geracao de credenciais off-chain, clientes que saibam montar commitment/reveal nos prazos corretos e, se necessario, camadas extras de auditoria (ex: provas de inclusao/exclusao, integraches com sistemas externos).

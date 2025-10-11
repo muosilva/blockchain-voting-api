@@ -1,8 +1,6 @@
 import { network } from "hardhat";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
 
 async function main() {
   const { ethers, provider } = await network.connect();
@@ -19,19 +17,34 @@ async function main() {
   const commitEndISO = new Date(commitEndAt * 1000).toISOString();
   const endISO = new Date(endAt * 1000).toISOString();
 
-  const F = await ethers.getContractFactory("SimpleVoting");
-  const contract = await F.connect(issuer).deploy(name, options, startAt, commitEndAt, endAt, issuer.address);
+  const baseTokenURI = "https://example.com/metadata/pautas/condominio/";
+
+  const F = await ethers.getContractFactory("TokenizedVoting");
+  const contract = await F
+    .connect(issuer)
+    .deploy(name, options, startAt, commitEndAt, endAt, issuer.address, baseTokenURI);
   await contract.waitForDeployment();
   const contractAddress = await contract.getAddress();
 
   console.log("Deploy:", contractAddress);
   console.log("Issuer (credential authority):", issuer.address);
+  console.log("Base token URI:", baseTokenURI);
 
   const plan = voters.map((signer, idx) => ({
     signer,
     optionIndex: idx < 3 ? 0 : 1,
-    label: idx + 1
+    label: idx + 1,
+    tokenId: 0n
   }));
+
+  for (const entry of plan) {
+    const mintTx = await contract.connect(issuer).mintVoteToken(entry.signer.address);
+    const mintReceipt = await mintTx.wait();
+    const mintedLog = mintReceipt.logs.find((log) => log.fragment?.name === "VoteTokenMinted");
+    const tokenId = mintedLog?.args?.tokenId ?? (await contract.nextTokenId()) - 1n;
+    entry.tokenId = tokenId;
+    console.log(`Mint vote token ${tokenId} for voter ${entry.signer.address}`);
+  }
 
   const voteRecords = [];
 
@@ -53,7 +66,9 @@ async function main() {
     );
     const signature = await issuer.signMessage(ethers.getBytes(msgHash));
 
-    const commitTx = await contract.connect(voter).commitVote(credentialHash, commitment, signature);
+    const commitTx = await contract
+      .connect(voter)
+      .commitVoteWithToken(entry.tokenId, credentialHash, commitment, signature);
     const commitReceipt = await commitTx.wait();
 
     entry.salt = salt;
@@ -82,6 +97,7 @@ async function main() {
       voteToken: entry.commitment,
       voterToken: entry.credentialHash,
       voto: options[entry.optionIndex],
+      tokenId: entry.tokenId.toString(),
       start: startISO,
       end: endISO,
       commitTx: entry.commitTx,
