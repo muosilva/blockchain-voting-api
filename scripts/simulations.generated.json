@@ -1,0 +1,79 @@
+{
+  "defaults": {
+    "issuerIndex": 0,
+    "voterOffset": 1,
+    "resetStateBetweenSimulations": true,
+    "timing": {
+      "startDelay": 5,
+      "commitDuration": 60,
+      "revealDuration": 60
+    }
+  },
+  "simulations": [
+    {
+      "id": "obra-emergencial",
+      "name": "Simulação - Obra Emergencial",
+      "description": "Simulação de votação para obra emergencial em condomínio.",
+      "options": [
+        "Aprovado",
+        "Negado"
+      ],
+      "votes": [
+        {
+          "label": "Morador 1",
+          "optionIndex": 0
+        },
+        {
+          "label": "Morador 2",
+          "optionIndex": 1
+        },
+        {
+          "label": "Morador 3",
+          "optionIndex": 0
+        }
+      ],
+      "issuerIndex": 0,
+      "output": {
+        "file": "cache/simulate-result-obra.json"
+      },
+      "timing": {
+        "startDelay": 10,
+        "commitDuration": 75,
+        "revealDuration": 75
+      }
+    },
+    {
+      "id": "sustentabilidade",
+      "name": "Simulação - Iniciativa de Sustentabilidade",
+      "description": "Simulação de votação para projeto de sustentabilidade em condomínio.",
+      "options": [
+        "Aprovado com modificações",
+        "Aprovado sem modificações",
+        "Negado"
+      ],
+      "votes": [
+        {
+          "label": "Morador 4",
+          "optionIndex": 0
+        },
+        {
+          "label": "Morador 5",
+          "optionIndex": 1
+        },
+        {
+          "label": "Morador 6",
+          "optionIndex": 2
+        }
+      ],
+      "issuerIndex": 1,
+      "output": {
+        "file": "cache/simulate-result-sustentabilidade.json"
+      },
+      "timing": {
+        "startDelay": 8,
+        "commitDuration": 60,
+        "revealDuration": 65
+      }
+    }
+  ]
+}

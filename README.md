@@ -102,6 +102,49 @@ Acesse `http://localhost:8080/frontend/index.html` (ajuste a porta/conjunto conf
 
 > Importante: sempre rode `npm run simulate` depois de iniciar o nó local para gerar um arquivo de resultados atualizado.
 
+## Geração de simulações via LM Studio
+
+Com o LM Studio rodando localmente (endpoint padrão `http://127.0.0.1:1234/v1/chat/completions`), você pode pedir à LLM que crie cenários prontos para o `scripts/simulate.js`.
+
+- Arquivo exemplo (guia para a LLM): `scripts/simulations.example.json`
+- Arquivo gerado (saída): `scripts/simulations.generated.json`
+
+O script `scripts/generate-simulations-llm.js` usa, por padrão, o exemplo acima para orientar a LLM e grava a saída no arquivo gerado:
+
+```bash
+node scripts/generate-simulations-llm.js --model "nome-do-modelo-no-lm-studio"
+```
+
+Opções úteis:
+- `--count` (`-c`): quantidade de simulações desejadas (ex.: `--count 10`).
+- `--temperature`: ajusta a criatividade da resposta da LLM (padrão `0.4`).
+- `--endpoint`: URL do servidor caso não esteja em `127.0.0.1:1234`.
+- `--model`: nome do modelo carregado no LM Studio.
+- `--out` (`-o`): caminho do arquivo de saída (padrão `scripts/simulations.generated.json`).
+- `--example`: caminho de um JSON exemplo para guiar a LLM (padrão `scripts/simulations.example.json`).
+- `--timeout`: timeout da requisição em ms (padrão `45000`).
+- `--help`: mostra todas as flags disponíveis.
+
+Exemplo para gerar 20 simulações variadas de assembleias condominiais:
+
+```bash
+node scripts/generate-simulations-llm.js --model "nome-do-modelo-no-lm-studio" --count 20
+```
+
+Depois da geração, você pode rodar o simulador diretamente (ele já usa o arquivo gerado por padrão):
+
+```bash
+npx hardhat run scripts/simulate.js --network localhost
+```
+
+Se desejar apontar para outro arquivo, use `--config`:
+
+```bash
+npx hardhat run scripts/simulate.js --network localhost --config caminho/para/arquivo.json
+```
+
+Assim você pode validar os cenários sugeridos pela LLM e alimentar a interface ou outros testes automatizados.
+
 ## Deploy manual (opcional)
 
 Caso queira fazer o deploy manual em outra rede Hardhat configurada, use:

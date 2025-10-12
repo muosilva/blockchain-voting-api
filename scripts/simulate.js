@@ -1,193 +1,58 @@
 import { network } from "hardhat";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
-
-import {
-  createIssuer,
-  issueBlindCredential,
-  signatureStructToHex
-} from "./blindSignature.js";
+import { parseArgs, printHelp, DEFAULT_CONFIG_PATH } from "./lib/sim-cli.js";
+import { loadSimulations, listSimulations, normalizeScenarioIds, selectSimulations } from "./lib/sim-config.js";
+import { prepareProviderReset } from "./lib/provider-utils.js";
+import { shouldReset } from "./lib/sim-helpers.js";
+import { runSimulation } from "./lib/runner.js";
 
 async function main() {
-  const { ethers, provider } = await network.connect();
-  const [deployer, ...accounts] = await ethers.getSigners();
-  const voters = accounts.slice(0, 5);
+  const args = parseArgs(process.argv);
+  const configPath = args.configPath ?? DEFAULT_CONFIG_PATH;
 
-  const issuer = createIssuer(ethers);
+  if (args.help) {
+    printHelp(configPath);
+    return;
+  }
 
-  const name = "Condominio";
-  const options = ["A", "B"];
-  const now = Math.floor(Date.now() / 1000);
-  const startAt = now + 5;
-  const commitEndAt = startAt + 60;
-  const endAt = commitEndAt + 60;
-  const startISO = new Date(startAt * 1000).toISOString();
-  const commitEndISO = new Date(commitEndAt * 1000).toISOString();
-  const endISO = new Date(endAt * 1000).toISOString();
+  const config = await loadSimulations(configPath);
 
-  const F = await ethers.getContractFactory("SimpleVoting");
-  const contract = await F.connect(deployer).deploy(
-    name,
-    options,
-    startAt,
-    commitEndAt,
-    endAt,
-    issuer.address,
-    issuer.publicKey.x,
-    issuer.publicKey.y
-  );
-  await contract.waitForDeployment();
-  const contractAddress = await contract.getAddress();
+  if (args.list) {
+    listSimulations(config);
+    return;
+  }
 
-  console.log("Deploy:", contractAddress);
-  console.log("Issuer public key X:", issuer.publicKeyHex.x);
-  console.log("Issuer public key Y:", issuer.publicKeyHex.y);
-  console.log("Issuer (derived address):", issuer.address);
+  const ids = normalizeScenarioIds(args.scenarioId);
+  const simulations = selectSimulations(config.simulations, ids);
 
-  const plan = voters.map((signer, idx) => ({
-    signer,
-    optionIndex: idx < 3 ? 0 : 1,
-    label: idx + 1
-  }));
+  const selectedNetwork = args.networkName ?? process.env.HARDHAT_NETWORK;
+  const connection = await network.connect(selectedNetwork);
+  const { ethers, provider, networkName } = connection;
+  const effectiveNetwork = networkName ?? selectedNetwork ?? "hardhat";
+  console.log(`Conectado a rede: ${effectiveNetwork}`);
 
-  const voteRecords = [];
-
-  await provider.send("evm_setNextBlockTimestamp", [startAt + 1]);
-  await provider.send("evm_mine", []);
-
-  for (const entry of plan) {
-    const voter = entry.signer;
-    const salt = ethers.hexlify(ethers.randomBytes(32));
-    const credentialSecret = ethers.hexlify(ethers.randomBytes(32));
-    const credentialHash = ethers.keccak256(credentialSecret);
-
-    const {
-      signatureStruct,
-      challengeHex,
-      blindedMessageHex,
-      blindSignatureHex
-    } = issueBlindCredential(credentialHash, ethers, issuer);
-
-    const commitment = ethers.solidityPackedKeccak256(
-      ["bytes32", "uint8", "bytes32"],
-      [credentialHash, entry.optionIndex, salt]
-    );
-
-    const commitTx = await contract.connect(voter).commitVote(credentialHash, commitment, signatureStruct);
-    const commitReceipt = await commitTx.wait();
-
-    const accepted = await contract.verifyCredential(credentialHash, signatureStruct);
-    if (!accepted) {
-      throw new Error(`Credential signature rejected for ${credentialHash}`);
+  const summary = [];
+  for (const simulation of simulations) {
+    let restoreState = null;
+    if (shouldReset(config.defaults, simulation)) {
+      const resetHandle = await prepareProviderReset(provider);
+      restoreState = resetHandle.restore;
     }
-
-    entry.salt = salt;
-    entry.commitment = commitment;
-    entry.credentialSecret = credentialSecret;
-    entry.credentialHash = credentialHash;
-    entry.signature = signatureStruct;
-    entry.signatureHex = signatureStructToHex(signatureStruct);
-    entry.challenge = challengeHex;
-    entry.blindedMessage = blindedMessageHex;
-    entry.sBlind = blindSignatureHex;
-    entry.commitTx = commitReceipt.hash;
-    entry.commitCaller = voter.address;
-
-    console.log(`Commit credential ${credentialHash} -> option ${entry.optionIndex}`);
+    let result;
+    try {
+      result = await runSimulation(simulation, { ethers, provider, defaults: config.defaults });
+    } finally {
+      if (restoreState) {
+        await restoreState();
+      }
+    }
+    summary.push(result);
   }
-
-  await provider.send("evm_setNextBlockTimestamp", [commitEndAt + 1]);
-  await provider.send("evm_mine", []);
-
-  for (const entry of plan) {
-    const voter = entry.signer;
-    const revealTx = await contract.connect(voter).revealVote(entry.credentialHash, entry.optionIndex, entry.salt);
-    const revealReceipt = await revealTx.wait();
-
-    const credentialDigest = await contract.credentialDigest(entry.credentialHash);
-
-    voteRecords.push({
-      pauta: name,
-      voteToken: entry.commitment,
-      voterToken: entry.credentialHash,
-      voto: options[entry.optionIndex],
-      start: startISO,
-      end: endISO,
-      commitTx: entry.commitTx,
-      revealTx: revealReceipt.hash,
-      credentialSecret: entry.credentialSecret,
-      blindSignature: entry.signatureHex,
-      blindedMessage: entry.blindedMessage,
-      blindSignatureRaw: entry.sBlind,
-      challenge: entry.challenge,
-      salt: entry.salt,
-      credentialDigest
+  if (summary.length > 1) {
+    console.log("\nResumo das simulacoes:");
+    summary.forEach((item) => {
+      console.log(`- ${item.id}: ${item.outputPath}`);
     });
-
-    console.log(`Reveal credential ${entry.credentialHash} -> option ${entry.optionIndex}`);
   }
-
-  const metadata = await contract.metadata();
-  const [optionLabels, optionCounts] = await contract.optionDetails();
-  const [leadingIndex, leadingVotes, hasTie] = await contract.leadingOption();
-  const version = Number(await contract.VERSION());
-  const networkInfo = await ethers.provider.getNetwork();
-
-  console.log("\nTally:");
-  optionLabels.forEach((label, i) => console.log(`- [${i}] ${label}: ${Number(optionCounts[i])}`));
-  console.log("Total:", Number(await contract.totalVotes()));
-  console.log(hasTie ? "Tie" : `Winner: [${Number(leadingIndex)}] ${optionLabels[Number(leadingIndex)]} with ${Number(leadingVotes)} votes`);
-
-  const outputPath = path.resolve(process.cwd(), "cache", "simulate-result.json");
-  await mkdir(path.dirname(outputPath), { recursive: true });
-  await writeFile(
-    outputPath,
-    JSON.stringify(
-      {
-        generatedAt: new Date().toISOString(),
-        contractAddress,
-        issuer: {
-          address: issuer.address,
-          privateKey: issuer.privateKey,
-          publicKey: {
-            x: issuer.publicKeyHex.x,
-            y: issuer.publicKeyHex.y
-          }
-        },
-        network: {
-          chainId: Number(networkInfo.chainId),
-          name: networkInfo.name
-        },
-        version,
-        metadata: {
-          name: metadata.name,
-          owner: metadata.owner,
-          issuer: metadata.issuer,
-          startAt: Number(metadata.startAt),
-          commitEndAt: Number(metadata.commitEndAt),
-          endAt: Number(metadata.endAt),
-          currentPhase: Number(metadata.phase),
-          finalized: metadata.finalized,
-          optionCount: Number(metadata.optionCount),
-          totalVotes: Number(metadata.totalVotes)
-        },
-        optionLabels,
-        optionCounts: optionCounts.map((value) => Number(value)),
-        leading: {
-          index: Number(leadingIndex),
-          votes: Number(leadingVotes),
-          tie: hasTie
-        },
-        commitEndISO,
-        endISO,
-        startISO,
-        votes: voteRecords
-      },
-      null,
-      2
-    )
-  );
-  console.log(`\nSimulation written to ${outputPath}`);
 }
 
 main().catch((error) => {
