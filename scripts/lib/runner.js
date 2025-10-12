@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { moveToTimestamp } from "./provider-utils.js";
 import { buildPlan, mergeTiming, slugify } from "./sim-helpers.js";
+import { createIssuer, issueBlindCredential } from "../blindSignature.js";
 
 /**
  * Runs a single simulation scenario: deploys the contract, commits and reveals votes, writes a result file.
@@ -25,9 +26,10 @@ export async function runSimulation(simulation, env) {
     throw new Error(`issuerIndex ${issuerIndex} invalido. Existem apenas ${signerInfos.length} contas disponiveis.`);
   }
 
-  const issuerInfo = signerInfos[issuerIndex];
-  const issuer = issuerInfo.signer;
-  const issuerAddress = issuerInfo.address;
+  const deployerInfo = signerInfos[issuerIndex];
+  const deployerSigner = deployerInfo.signer;
+  const deployerAddress = deployerInfo.address;
+  const credentialIssuer = createIssuer(ethers);
 
   if (!Array.isArray(simulation.options) || simulation.options.length < 2) {
     throw new Error(`A simulacao ${simulation.name ?? simulation.id ?? "sem-id"} precisa ter ao menos duas opcoes.`);
@@ -59,17 +61,41 @@ export async function runSimulation(simulation, env) {
 
   const contractName = simulation.contractName ?? "SimpleVoting";
   let deployArgs = simulation.deployArgs;
+  const defaultArgs = [
+    simulation.name ?? label,
+    simulation.options,
+    startAt,
+    commitEndAt,
+    endAt,
+    credentialIssuer.address,
+    credentialIssuer.publicKey.x,
+    credentialIssuer.publicKey.y,
+  ];
   if (!Array.isArray(deployArgs)) {
-    deployArgs = [simulation.name ?? label, simulation.options, startAt, commitEndAt, endAt, issuerAddress];
+    deployArgs = defaultArgs;
+  } else {
+    const args = [...deployArgs];
+    if (args.length < 6) {
+      throw new Error(`deployArgs invalido: esperado ao menos 6 parametros, recebido ${args.length}.`);
+    }
+    args[5] = credentialIssuer.address;
+    if (args.length === 6) {
+      args.push(credentialIssuer.publicKey.x, credentialIssuer.publicKey.y);
+    } else {
+      args[6] = credentialIssuer.publicKey.x;
+      args[7] = credentialIssuer.publicKey.y;
+    }
+    deployArgs = args;
   }
 
   const factory = await ethers.getContractFactory(contractName);
-  const contract = await factory.connect(issuer).deploy(...deployArgs);
+  const contract = await factory.connect(deployerSigner).deploy(...deployArgs);
   await contract.waitForDeployment();
   const contractAddress = await contract.getAddress();
 
   console.log("Deploy:", contractAddress);
-  console.log("Issuer (credential authority):", issuerAddress);
+  console.log("Owner (deployer):", deployerAddress);
+  console.log("Issuer (credential authority):", credentialIssuer.address);
 
   const voteRecords = [];
 
@@ -82,15 +108,16 @@ export async function runSimulation(simulation, env) {
     const credentialSecret = ethers.hexlify(ethers.randomBytes(32));
     const credentialHash = ethers.keccak256(credentialSecret);
     const commitment = ethers.solidityPackedKeccak256(["bytes32", "uint8", "bytes32"], [credentialHash, entry.optionIndex, salt]);
-    const msgHash = ethers.solidityPackedKeccak256(["string", "bytes32"], ["SimpleVoting:", credentialHash]);
-    const signature = await issuer.signMessage(ethers.getBytes(msgHash));
+    const { signatureStruct } = issueBlindCredential(credentialHash, ethers, credentialIssuer);
 
-    const commitTx = await contract.connect(voter).commitVote(credentialHash, commitment, signature);
+    const commitTx = await contract.connect(voter).commitVote(credentialHash, commitment, signatureStruct);
     await commitTx.wait();
 
     entry.salt = salt;
     entry.commitment = commitment;
     entry.credentialHash = credentialHash;
+    entry.credentialSignature = signatureStruct;
+    entry.commitTx = commitTx.hash;
 
     console.log(`Commit credential ${credentialHash} (conta ${voterAddress})`);
   }
@@ -107,6 +134,12 @@ export async function runSimulation(simulation, env) {
     voteRecords.push({
       voterToken: entry.credentialHash,
       voteToken: entry.commitment,
+      optionIndex: entry.optionIndex,
+      optionLabel: simulation.options[entry.optionIndex],
+      voto: simulation.options[entry.optionIndex],
+      salt: entry.salt,
+      commitTx: entry.commitTx,
+      revealTx: revealTx.hash,
     });
 
     console.log(`Reveal credential ${entry.credentialHash} (conta ${revealAddress})`);
@@ -117,6 +150,11 @@ export async function runSimulation(simulation, env) {
   const [leadingIndex, leadingVotes, hasTie] = await contract.leadingOption();
   const version = Number(await contract.VERSION());
   const networkInfo = await ethers.provider.getNetwork();
+  const leadingSummary = {
+    index: Number(leadingIndex),
+    votes: Number(leadingVotes),
+    tie: hasTie,
+  };
 
   console.log("\nTally:");
   optionLabels.forEach((optionLabel, i) => {
@@ -125,62 +163,90 @@ export async function runSimulation(simulation, env) {
   console.log("Total:", Number(await contract.totalVotes()));
   console.log(hasTie ? "Tie" : `Winner: [${Number(leadingIndex)}] ${optionLabels[Number(leadingIndex)]} com ${Number(leadingVotes)} votos`);
 
-  const outputDirectory = simulation.output?.directory ?? "cache";
-  const outputFileName = simulation.output?.file ?? `simulate-${slugify(simulation.id ?? simulation.name ?? label)}.json`;
-  const outputPath = path.resolve(process.cwd(), outputDirectory, outputFileName);
+  const defaultFileName = `simulate-${slugify(simulation.id ?? simulation.name ?? label)}.json`;
+  let outputPath;
+  if (typeof simulation.output?.file === "string" && simulation.output.file.length > 0) {
+    const fileRef = simulation.output.file;
+    outputPath = path.isAbsolute(fileRef) ? fileRef : path.resolve(process.cwd(), fileRef);
+  } else {
+    const outputDirectory = simulation.output?.directory ?? "cache";
+    const fileName = simulation.output?.file ?? defaultFileName;
+    outputPath = path.resolve(process.cwd(), outputDirectory, fileName);
+  }
 
   await mkdir(path.dirname(outputPath), { recursive: true });
-  await writeFile(
-    outputPath,
-    JSON.stringify(
-      {
-        generatedAt: new Date().toISOString(),
-        simulation: {
-          id: simulation.id ?? null,
-          label,
-          config: {
-            name: simulation.name ?? null,
-            options: simulation.options,
-            timing,
-            issuerIndex,
-          },
-        },
-        contractAddress,
-        network: {
-          chainId: Number(networkInfo.chainId),
-          name: networkInfo.name,
-        },
-        version,
-        metadata: {
-          name: metadata.name,
-          owner: metadata.owner,
-          issuer: metadata.issuer,
-          startAt: Number(metadata.startAt),
-          commitEndAt: Number(metadata.commitEndAt),
-          endAt: Number(metadata.endAt),
-          currentPhase: Number(metadata.phase),
-          finalized: metadata.finalized,
-          optionCount: Number(metadata.optionCount),
-          totalVotes: Number(metadata.totalVotes),
-        },
-        optionLabels,
-        optionCounts: optionCounts.map((value) => Number(value)),
-        leading: {
-          index: Number(leadingIndex),
-          votes: Number(leadingVotes),
-          tie: hasTie,
-        },
-        commitEndISO,
-        endISO,
-        startISO,
-        votes: voteRecords,
+  const generatedAt = new Date().toISOString();
+  const detailedResult = {
+    generatedAt,
+    simulation: {
+      id: simulation.id ?? null,
+      label,
+      config: {
+        name: simulation.name ?? null,
+        options: simulation.options,
+        timing,
+        issuerIndex,
       },
-      null,
-      2
-    )
-  );
+    },
+    contractAddress,
+    network: {
+      chainId: Number(networkInfo.chainId),
+      name: networkInfo.name,
+    },
+    version,
+    metadata: {
+      name: metadata.name,
+      owner: metadata.owner,
+      issuer: metadata.issuer,
+      startAt: Number(metadata.startAt),
+      commitEndAt: Number(metadata.commitEndAt),
+      endAt: Number(metadata.endAt),
+      currentPhase: Number(metadata.phase),
+      finalized: metadata.finalized,
+      optionCount: Number(metadata.optionCount),
+      totalVotes: Number(metadata.totalVotes),
+    },
+    optionLabels,
+    optionCounts: optionCounts.map((value) => Number(value)),
+    leading: leadingSummary,
+    commitEndISO,
+    endISO,
+    startISO,
+    votes: voteRecords,
+  };
+  await writeFile(outputPath, JSON.stringify(detailedResult, null, 2));
+
+  const cacheDir = path.resolve(process.cwd(), "cache");
+  await mkdir(cacheDir, { recursive: true });
+  const legacyPayload = {
+    pauta: metadata.name,
+    generatedAt,
+    contractAddress,
+    issuer: metadata.issuer,
+    startISO,
+    commitEndISO,
+    endISO,
+    optionLabels,
+    optionCounts: optionCounts.map((value) => Number(value)),
+    leading: leadingSummary,
+    votes: voteRecords.map((vote) => ({
+      pauta: metadata.name,
+      voteToken: vote.voteToken,
+      voterToken: vote.voterToken,
+      voto: vote.voto,
+      optionIndex: vote.optionIndex,
+      optionLabel: vote.optionLabel,
+      salt: vote.salt,
+      commitTx: vote.commitTx,
+      revealTx: vote.revealTx,
+      start: startISO,
+      end: endISO,
+    })),
+  };
+  const legacyPath = path.resolve(cacheDir, "simulate-result.json");
+  await writeFile(legacyPath, JSON.stringify(legacyPayload, null, 2));
 
   console.log(`\nSimulacao gravada em ${outputPath}`);
 
-  return { id: simulation.id ?? label, name: simulation.name ?? label, outputPath };
+  return { id: simulation.id ?? label, name: simulation.name ?? label, outputPath, cachePath: legacyPath };
 }
