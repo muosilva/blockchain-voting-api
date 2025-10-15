@@ -13,18 +13,15 @@ export declare namespace SimpleVoting {
     }
 
   export interface TokenizedVotingInterface extends Interface {
-    getFunction(nameOrSignature: "VERSION" | "addOption" | "approve" | "balanceOf" | "ballotOf" | "ballotStatus" | "ballotWeight" | "baseTokenURI" | "commitEndAt" | "commitVote" | "commitVoteWithToken" | "computeCommitment" | "credentialDigest" | "currentPhase" | "endAt" | "finalize" | "finalized" | "getApproved" | "getOption" | "isApprovedForAll" | "isCommitPhase" | "isCredentialRevoked" | "isOpen" | "isRevealPhase" | "issuer" | "leadingOption" | "metadata" | "mintVoteToken" | "mintVoteTokens" | "name" | "nextTokenId" | "optionCount" | "optionDetails" | "options" | "owner" | "ownerOf" | "proposalName" | "restoreCredential" | "revealVote" | "revokeCredential" | "safeTransferFrom(address,address,uint256)" | "safeTransferFrom(address,address,uint256,bytes)" | "setApprovalForAll" | "setBaseTokenURI" | "setName" | "startAt" | "supportsInterface" | "symbol" | "tally" | "tokenURI" | "tokenUsed" | "totalVotes" | "transferFrom" | "verifyCredential"): FunctionFragment;
+    getFunction(nameOrSignature: "VERSION" | "addOption" | "ballotOf" | "ballotStatus" | "ballotWeight" | "commitEndAt" | "commitVote" | "commitVoteWithToken" | "computeCommitment" | "credentialDigest" | "currentPhase" | "endAt" | "finalize" | "finalized" | "getOption" | "isCommitPhase" | "isCredentialRevoked" | "isOpen" | "isRevealPhase" | "issuer" | "leadingOption" | "metadata" | "optionCount" | "optionDetails" | "options" | "owner" | "proposalName" | "restoreCredential" | "revealVote" | "revokeCredential" | "setName" | "stakeToken" | "stakeTokenAddress" | "startAt" | "tally" | "tokenUsed" | "totalVotes" | "verifyCredential"): FunctionFragment;
 
-    getEvent(nameOrSignatureOrTopic: "Approval" | "ApprovalForAll" | "BaseTokenURISet" | "Committed" | "CredentialRestoredEvent" | "CredentialRevokedEvent" | "Finalized" | "NameUpdated" | "OptionAdded" | "Transfer" | "VoteTokenMinted" | "VoteTokenUsed" | "Voted"): EventFragment;
+    getEvent(nameOrSignatureOrTopic: "Committed" | "CredentialRestoredEvent" | "CredentialRevokedEvent" | "Finalized" | "NameUpdated" | "OptionAdded" | "StakeTokenUsed" | "Voted"): EventFragment;
 
     encodeFunctionData(functionFragment: 'VERSION', values?: undefined): string;
 encodeFunctionData(functionFragment: 'addOption', values: [string]): string;
-encodeFunctionData(functionFragment: 'approve', values: [AddressLike, BigNumberish]): string;
-encodeFunctionData(functionFragment: 'balanceOf', values: [AddressLike]): string;
 encodeFunctionData(functionFragment: 'ballotOf', values: [BytesLike]): string;
 encodeFunctionData(functionFragment: 'ballotStatus', values: [BytesLike]): string;
 encodeFunctionData(functionFragment: 'ballotWeight', values: [BytesLike]): string;
-encodeFunctionData(functionFragment: 'baseTokenURI', values?: undefined): string;
 encodeFunctionData(functionFragment: 'commitEndAt', values?: undefined): string;
 encodeFunctionData(functionFragment: 'commitVote', values: [BytesLike, BytesLike, BytesLike]): string;
 encodeFunctionData(functionFragment: 'commitVoteWithToken', values: [BigNumberish, BytesLike, BytesLike, BytesLike]): string;
@@ -34,9 +31,7 @@ encodeFunctionData(functionFragment: 'currentPhase', values?: undefined): string
 encodeFunctionData(functionFragment: 'endAt', values?: undefined): string;
 encodeFunctionData(functionFragment: 'finalize', values?: undefined): string;
 encodeFunctionData(functionFragment: 'finalized', values?: undefined): string;
-encodeFunctionData(functionFragment: 'getApproved', values: [BigNumberish]): string;
 encodeFunctionData(functionFragment: 'getOption', values: [BigNumberish]): string;
-encodeFunctionData(functionFragment: 'isApprovedForAll', values: [AddressLike, AddressLike]): string;
 encodeFunctionData(functionFragment: 'isCommitPhase', values?: undefined): string;
 encodeFunctionData(functionFragment: 'isCredentialRevoked', values: [BytesLike]): string;
 encodeFunctionData(functionFragment: 'isOpen', values?: undefined): string;
@@ -44,42 +39,28 @@ encodeFunctionData(functionFragment: 'isRevealPhase', values?: undefined): strin
 encodeFunctionData(functionFragment: 'issuer', values?: undefined): string;
 encodeFunctionData(functionFragment: 'leadingOption', values?: undefined): string;
 encodeFunctionData(functionFragment: 'metadata', values?: undefined): string;
-encodeFunctionData(functionFragment: 'mintVoteToken', values: [AddressLike]): string;
-encodeFunctionData(functionFragment: 'mintVoteTokens', values: [AddressLike[]]): string;
-encodeFunctionData(functionFragment: 'name', values?: undefined): string;
-encodeFunctionData(functionFragment: 'nextTokenId', values?: undefined): string;
 encodeFunctionData(functionFragment: 'optionCount', values?: undefined): string;
 encodeFunctionData(functionFragment: 'optionDetails', values?: undefined): string;
 encodeFunctionData(functionFragment: 'options', values?: undefined): string;
 encodeFunctionData(functionFragment: 'owner', values?: undefined): string;
-encodeFunctionData(functionFragment: 'ownerOf', values: [BigNumberish]): string;
 encodeFunctionData(functionFragment: 'proposalName', values?: undefined): string;
 encodeFunctionData(functionFragment: 'restoreCredential', values: [BytesLike]): string;
 encodeFunctionData(functionFragment: 'revealVote', values: [BytesLike, BigNumberish, BytesLike]): string;
 encodeFunctionData(functionFragment: 'revokeCredential', values: [BytesLike]): string;
-encodeFunctionData(functionFragment: 'safeTransferFrom(address,address,uint256)', values: [AddressLike, AddressLike, BigNumberish]): string;
-encodeFunctionData(functionFragment: 'safeTransferFrom(address,address,uint256,bytes)', values: [AddressLike, AddressLike, BigNumberish, BytesLike]): string;
-encodeFunctionData(functionFragment: 'setApprovalForAll', values: [AddressLike, boolean]): string;
-encodeFunctionData(functionFragment: 'setBaseTokenURI', values: [string]): string;
 encodeFunctionData(functionFragment: 'setName', values: [string]): string;
+encodeFunctionData(functionFragment: 'stakeToken', values?: undefined): string;
+encodeFunctionData(functionFragment: 'stakeTokenAddress', values?: undefined): string;
 encodeFunctionData(functionFragment: 'startAt', values?: undefined): string;
-encodeFunctionData(functionFragment: 'supportsInterface', values: [BytesLike]): string;
-encodeFunctionData(functionFragment: 'symbol', values?: undefined): string;
 encodeFunctionData(functionFragment: 'tally', values?: undefined): string;
-encodeFunctionData(functionFragment: 'tokenURI', values: [BigNumberish]): string;
 encodeFunctionData(functionFragment: 'tokenUsed', values: [BigNumberish]): string;
 encodeFunctionData(functionFragment: 'totalVotes', values?: undefined): string;
-encodeFunctionData(functionFragment: 'transferFrom', values: [AddressLike, AddressLike, BigNumberish]): string;
 encodeFunctionData(functionFragment: 'verifyCredential', values: [BytesLike, BytesLike]): string;
 
     decodeFunctionResult(functionFragment: 'VERSION', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'addOption', data: BytesLike): Result;
-decodeFunctionResult(functionFragment: 'approve', data: BytesLike): Result;
-decodeFunctionResult(functionFragment: 'balanceOf', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'ballotOf', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'ballotStatus', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'ballotWeight', data: BytesLike): Result;
-decodeFunctionResult(functionFragment: 'baseTokenURI', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'commitEndAt', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'commitVote', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'commitVoteWithToken', data: BytesLike): Result;
@@ -89,9 +70,7 @@ decodeFunctionResult(functionFragment: 'currentPhase', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'endAt', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'finalize', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'finalized', data: BytesLike): Result;
-decodeFunctionResult(functionFragment: 'getApproved', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'getOption', data: BytesLike): Result;
-decodeFunctionResult(functionFragment: 'isApprovedForAll', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'isCommitPhase', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'isCredentialRevoked', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'isOpen', data: BytesLike): Result;
@@ -99,72 +78,25 @@ decodeFunctionResult(functionFragment: 'isRevealPhase', data: BytesLike): Result
 decodeFunctionResult(functionFragment: 'issuer', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'leadingOption', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'metadata', data: BytesLike): Result;
-decodeFunctionResult(functionFragment: 'mintVoteToken', data: BytesLike): Result;
-decodeFunctionResult(functionFragment: 'mintVoteTokens', data: BytesLike): Result;
-decodeFunctionResult(functionFragment: 'name', data: BytesLike): Result;
-decodeFunctionResult(functionFragment: 'nextTokenId', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'optionCount', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'optionDetails', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'options', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'owner', data: BytesLike): Result;
-decodeFunctionResult(functionFragment: 'ownerOf', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'proposalName', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'restoreCredential', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'revealVote', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'revokeCredential', data: BytesLike): Result;
-decodeFunctionResult(functionFragment: 'safeTransferFrom(address,address,uint256)', data: BytesLike): Result;
-decodeFunctionResult(functionFragment: 'safeTransferFrom(address,address,uint256,bytes)', data: BytesLike): Result;
-decodeFunctionResult(functionFragment: 'setApprovalForAll', data: BytesLike): Result;
-decodeFunctionResult(functionFragment: 'setBaseTokenURI', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'setName', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'stakeToken', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'stakeTokenAddress', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'startAt', data: BytesLike): Result;
-decodeFunctionResult(functionFragment: 'supportsInterface', data: BytesLike): Result;
-decodeFunctionResult(functionFragment: 'symbol', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'tally', data: BytesLike): Result;
-decodeFunctionResult(functionFragment: 'tokenURI', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'tokenUsed', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'totalVotes', data: BytesLike): Result;
-decodeFunctionResult(functionFragment: 'transferFrom', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'verifyCredential', data: BytesLike): Result;
   }
 
   
-    export namespace ApprovalEvent {
-      export type InputTuple = [owner: AddressLike, approved: AddressLike, tokenId: BigNumberish];
-      export type OutputTuple = [owner: string, approved: string, tokenId: bigint];
-      export interface OutputObject {owner: string, approved: string, tokenId: bigint };
-      export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
-      export type Filter = TypedDeferredTopicFilter<Event>
-      export type Log = TypedEventLog<Event>
-      export type LogDescription = TypedLogDescription<Event>
-    }
-
-  
-
-    export namespace ApprovalForAllEvent {
-      export type InputTuple = [owner: AddressLike, operator: AddressLike, approved: boolean];
-      export type OutputTuple = [owner: string, operator: string, approved: boolean];
-      export interface OutputObject {owner: string, operator: string, approved: boolean };
-      export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
-      export type Filter = TypedDeferredTopicFilter<Event>
-      export type Log = TypedEventLog<Event>
-      export type LogDescription = TypedLogDescription<Event>
-    }
-
-  
-
-    export namespace BaseTokenURISetEvent {
-      export type InputTuple = [uri: string];
-      export type OutputTuple = [uri: string];
-      export interface OutputObject {uri: string };
-      export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
-      export type Filter = TypedDeferredTopicFilter<Event>
-      export type Log = TypedEventLog<Event>
-      export type LogDescription = TypedLogDescription<Event>
-    }
-
-  
-
     export namespace CommittedEvent {
       export type InputTuple = [commitment: BytesLike, timestamp: BigNumberish];
       export type OutputTuple = [commitment: string, timestamp: bigint];
@@ -237,31 +169,7 @@ decodeFunctionResult(functionFragment: 'verifyCredential', data: BytesLike): Res
 
   
 
-    export namespace TransferEvent {
-      export type InputTuple = [from: AddressLike, to: AddressLike, tokenId: BigNumberish];
-      export type OutputTuple = [from: string, to: string, tokenId: bigint];
-      export interface OutputObject {from: string, to: string, tokenId: bigint };
-      export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
-      export type Filter = TypedDeferredTopicFilter<Event>
-      export type Log = TypedEventLog<Event>
-      export type LogDescription = TypedLogDescription<Event>
-    }
-
-  
-
-    export namespace VoteTokenMintedEvent {
-      export type InputTuple = [to: AddressLike, tokenId: BigNumberish];
-      export type OutputTuple = [to: string, tokenId: bigint];
-      export interface OutputObject {to: string, tokenId: bigint };
-      export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
-      export type Filter = TypedDeferredTopicFilter<Event>
-      export type Log = TypedEventLog<Event>
-      export type LogDescription = TypedLogDescription<Event>
-    }
-
-  
-
-    export namespace VoteTokenUsedEvent {
+    export namespace StakeTokenUsedEvent {
       export type InputTuple = [tokenId: BigNumberish, credentialHash: BytesLike, caller: AddressLike];
       export type OutputTuple = [tokenId: bigint, credentialHash: string, caller: string];
       export interface OutputObject {tokenId: bigint, credentialHash: string, caller: string };
@@ -335,22 +243,6 @@ decodeFunctionResult(functionFragment: 'verifyCredential', data: BytesLike): Res
     
 
     
-    approve: TypedContractMethod<
-      [to: AddressLike, tokenId: BigNumberish, ],
-      [void],
-      'nonpayable'
-    >
-    
-
-    
-    balanceOf: TypedContractMethod<
-      [owner: AddressLike, ],
-      [bigint],
-      'view'
-    >
-    
-
-    
     ballotOf: TypedContractMethod<
       [credentialHash: BytesLike, ],
       [[string, boolean] & {commitment: string, revealed: boolean }],
@@ -370,14 +262,6 @@ decodeFunctionResult(functionFragment: 'verifyCredential', data: BytesLike): Res
     ballotWeight: TypedContractMethod<
       [credentialHash: BytesLike, ],
       [bigint],
-      'view'
-    >
-    
-
-    
-    baseTokenURI: TypedContractMethod<
-      [],
-      [string],
       'view'
     >
     
@@ -455,25 +339,9 @@ decodeFunctionResult(functionFragment: 'verifyCredential', data: BytesLike): Res
     
 
     
-    getApproved: TypedContractMethod<
-      [tokenId: BigNumberish, ],
-      [string],
-      'view'
-    >
-    
-
-    
     getOption: TypedContractMethod<
       [index: BigNumberish, ],
       [[string, bigint] & {label: string, votes: bigint }],
-      'view'
-    >
-    
-
-    
-    isApprovedForAll: TypedContractMethod<
-      [owner: AddressLike, operator: AddressLike, ],
-      [boolean],
       'view'
     >
     
@@ -535,38 +403,6 @@ decodeFunctionResult(functionFragment: 'verifyCredential', data: BytesLike): Res
     
 
     
-    mintVoteToken: TypedContractMethod<
-      [to: AddressLike, ],
-      [bigint],
-      'nonpayable'
-    >
-    
-
-    
-    mintVoteTokens: TypedContractMethod<
-      [recipients: AddressLike[], ],
-      [void],
-      'nonpayable'
-    >
-    
-
-    
-    name: TypedContractMethod<
-      [],
-      [string],
-      'view'
-    >
-    
-
-    
-    nextTokenId: TypedContractMethod<
-      [],
-      [bigint],
-      'view'
-    >
-    
-
-    
     optionCount: TypedContractMethod<
       [],
       [bigint],
@@ -593,14 +429,6 @@ decodeFunctionResult(functionFragment: 'verifyCredential', data: BytesLike): Res
     
     owner: TypedContractMethod<
       [],
-      [string],
-      'view'
-    >
-    
-
-    
-    ownerOf: TypedContractMethod<
-      [tokenId: BigNumberish, ],
       [string],
       'view'
     >
@@ -639,42 +467,26 @@ decodeFunctionResult(functionFragment: 'verifyCredential', data: BytesLike): Res
     
 
     
-    "safeTransferFrom(address,address,uint256)": TypedContractMethod<
-      [from: AddressLike, to: AddressLike, tokenId: BigNumberish, ],
-      [void],
-      'nonpayable'
-    >
-    
-
-    
-    "safeTransferFrom(address,address,uint256,bytes)": TypedContractMethod<
-      [from: AddressLike, to: AddressLike, tokenId: BigNumberish, data: BytesLike, ],
-      [void],
-      'nonpayable'
-    >
-    
-
-    
-    setApprovalForAll: TypedContractMethod<
-      [operator: AddressLike, approved: boolean, ],
-      [void],
-      'nonpayable'
-    >
-    
-
-    
-    setBaseTokenURI: TypedContractMethod<
-      [newBaseURI: string, ],
-      [void],
-      'nonpayable'
-    >
-    
-
-    
     setName: TypedContractMethod<
       [newName: string, ],
       [void],
       'nonpayable'
+    >
+    
+
+    
+    stakeToken: TypedContractMethod<
+      [],
+      [string],
+      'view'
+    >
+    
+
+    
+    stakeTokenAddress: TypedContractMethod<
+      [],
+      [string],
+      'view'
     >
     
 
@@ -687,33 +499,9 @@ decodeFunctionResult(functionFragment: 'verifyCredential', data: BytesLike): Res
     
 
     
-    supportsInterface: TypedContractMethod<
-      [interfaceId: BytesLike, ],
-      [boolean],
-      'view'
-    >
-    
-
-    
-    symbol: TypedContractMethod<
-      [],
-      [string],
-      'view'
-    >
-    
-
-    
     tally: TypedContractMethod<
       [],
       [bigint[]],
-      'view'
-    >
-    
-
-    
-    tokenURI: TypedContractMethod<
-      [tokenId: BigNumberish, ],
-      [string],
       'view'
     >
     
@@ -731,14 +519,6 @@ decodeFunctionResult(functionFragment: 'verifyCredential', data: BytesLike): Res
       [],
       [bigint],
       'view'
-    >
-    
-
-    
-    transferFrom: TypedContractMethod<
-      [from: AddressLike, to: AddressLike, tokenId: BigNumberish, ],
-      [void],
-      'nonpayable'
     >
     
 
@@ -763,16 +543,6 @@ getFunction(nameOrSignature: 'addOption'): TypedContractMethod<
       [void],
       'nonpayable'
     >;
-getFunction(nameOrSignature: 'approve'): TypedContractMethod<
-      [to: AddressLike, tokenId: BigNumberish, ],
-      [void],
-      'nonpayable'
-    >;
-getFunction(nameOrSignature: 'balanceOf'): TypedContractMethod<
-      [owner: AddressLike, ],
-      [bigint],
-      'view'
-    >;
 getFunction(nameOrSignature: 'ballotOf'): TypedContractMethod<
       [credentialHash: BytesLike, ],
       [[string, boolean] & {commitment: string, revealed: boolean }],
@@ -786,11 +556,6 @@ getFunction(nameOrSignature: 'ballotStatus'): TypedContractMethod<
 getFunction(nameOrSignature: 'ballotWeight'): TypedContractMethod<
       [credentialHash: BytesLike, ],
       [bigint],
-      'view'
-    >;
-getFunction(nameOrSignature: 'baseTokenURI'): TypedContractMethod<
-      [],
-      [string],
       'view'
     >;
 getFunction(nameOrSignature: 'commitEndAt'): TypedContractMethod<
@@ -838,19 +603,9 @@ getFunction(nameOrSignature: 'finalized'): TypedContractMethod<
       [boolean],
       'view'
     >;
-getFunction(nameOrSignature: 'getApproved'): TypedContractMethod<
-      [tokenId: BigNumberish, ],
-      [string],
-      'view'
-    >;
 getFunction(nameOrSignature: 'getOption'): TypedContractMethod<
       [index: BigNumberish, ],
       [[string, bigint] & {label: string, votes: bigint }],
-      'view'
-    >;
-getFunction(nameOrSignature: 'isApprovedForAll'): TypedContractMethod<
-      [owner: AddressLike, operator: AddressLike, ],
-      [boolean],
       'view'
     >;
 getFunction(nameOrSignature: 'isCommitPhase'): TypedContractMethod<
@@ -888,26 +643,6 @@ getFunction(nameOrSignature: 'metadata'): TypedContractMethod<
       [SimpleVoting.ElectionMetadataStructOutput],
       'view'
     >;
-getFunction(nameOrSignature: 'mintVoteToken'): TypedContractMethod<
-      [to: AddressLike, ],
-      [bigint],
-      'nonpayable'
-    >;
-getFunction(nameOrSignature: 'mintVoteTokens'): TypedContractMethod<
-      [recipients: AddressLike[], ],
-      [void],
-      'nonpayable'
-    >;
-getFunction(nameOrSignature: 'name'): TypedContractMethod<
-      [],
-      [string],
-      'view'
-    >;
-getFunction(nameOrSignature: 'nextTokenId'): TypedContractMethod<
-      [],
-      [bigint],
-      'view'
-    >;
 getFunction(nameOrSignature: 'optionCount'): TypedContractMethod<
       [],
       [bigint],
@@ -925,11 +660,6 @@ getFunction(nameOrSignature: 'options'): TypedContractMethod<
     >;
 getFunction(nameOrSignature: 'owner'): TypedContractMethod<
       [],
-      [string],
-      'view'
-    >;
-getFunction(nameOrSignature: 'ownerOf'): TypedContractMethod<
-      [tokenId: BigNumberish, ],
       [string],
       'view'
     >;
@@ -953,54 +683,29 @@ getFunction(nameOrSignature: 'revokeCredential'): TypedContractMethod<
       [void],
       'nonpayable'
     >;
-getFunction(nameOrSignature: 'safeTransferFrom(address,address,uint256)'): TypedContractMethod<
-      [from: AddressLike, to: AddressLike, tokenId: BigNumberish, ],
-      [void],
-      'nonpayable'
-    >;
-getFunction(nameOrSignature: 'safeTransferFrom(address,address,uint256,bytes)'): TypedContractMethod<
-      [from: AddressLike, to: AddressLike, tokenId: BigNumberish, data: BytesLike, ],
-      [void],
-      'nonpayable'
-    >;
-getFunction(nameOrSignature: 'setApprovalForAll'): TypedContractMethod<
-      [operator: AddressLike, approved: boolean, ],
-      [void],
-      'nonpayable'
-    >;
-getFunction(nameOrSignature: 'setBaseTokenURI'): TypedContractMethod<
-      [newBaseURI: string, ],
-      [void],
-      'nonpayable'
-    >;
 getFunction(nameOrSignature: 'setName'): TypedContractMethod<
       [newName: string, ],
       [void],
       'nonpayable'
+    >;
+getFunction(nameOrSignature: 'stakeToken'): TypedContractMethod<
+      [],
+      [string],
+      'view'
+    >;
+getFunction(nameOrSignature: 'stakeTokenAddress'): TypedContractMethod<
+      [],
+      [string],
+      'view'
     >;
 getFunction(nameOrSignature: 'startAt'): TypedContractMethod<
       [],
       [bigint],
       'view'
     >;
-getFunction(nameOrSignature: 'supportsInterface'): TypedContractMethod<
-      [interfaceId: BytesLike, ],
-      [boolean],
-      'view'
-    >;
-getFunction(nameOrSignature: 'symbol'): TypedContractMethod<
-      [],
-      [string],
-      'view'
-    >;
 getFunction(nameOrSignature: 'tally'): TypedContractMethod<
       [],
       [bigint[]],
-      'view'
-    >;
-getFunction(nameOrSignature: 'tokenURI'): TypedContractMethod<
-      [tokenId: BigNumberish, ],
-      [string],
       'view'
     >;
 getFunction(nameOrSignature: 'tokenUsed'): TypedContractMethod<
@@ -1013,45 +718,23 @@ getFunction(nameOrSignature: 'totalVotes'): TypedContractMethod<
       [bigint],
       'view'
     >;
-getFunction(nameOrSignature: 'transferFrom'): TypedContractMethod<
-      [from: AddressLike, to: AddressLike, tokenId: BigNumberish, ],
-      [void],
-      'nonpayable'
-    >;
 getFunction(nameOrSignature: 'verifyCredential'): TypedContractMethod<
       [credentialHash: BytesLike, signature: BytesLike, ],
       [boolean],
       'view'
     >;
 
-    getEvent(key: 'Approval'): TypedContractEvent<ApprovalEvent.InputTuple, ApprovalEvent.OutputTuple, ApprovalEvent.OutputObject>;
-getEvent(key: 'ApprovalForAll'): TypedContractEvent<ApprovalForAllEvent.InputTuple, ApprovalForAllEvent.OutputTuple, ApprovalForAllEvent.OutputObject>;
-getEvent(key: 'BaseTokenURISet'): TypedContractEvent<BaseTokenURISetEvent.InputTuple, BaseTokenURISetEvent.OutputTuple, BaseTokenURISetEvent.OutputObject>;
-getEvent(key: 'Committed'): TypedContractEvent<CommittedEvent.InputTuple, CommittedEvent.OutputTuple, CommittedEvent.OutputObject>;
+    getEvent(key: 'Committed'): TypedContractEvent<CommittedEvent.InputTuple, CommittedEvent.OutputTuple, CommittedEvent.OutputObject>;
 getEvent(key: 'CredentialRestoredEvent'): TypedContractEvent<CredentialRestoredEventEvent.InputTuple, CredentialRestoredEventEvent.OutputTuple, CredentialRestoredEventEvent.OutputObject>;
 getEvent(key: 'CredentialRevokedEvent'): TypedContractEvent<CredentialRevokedEventEvent.InputTuple, CredentialRevokedEventEvent.OutputTuple, CredentialRevokedEventEvent.OutputObject>;
 getEvent(key: 'Finalized'): TypedContractEvent<FinalizedEvent.InputTuple, FinalizedEvent.OutputTuple, FinalizedEvent.OutputObject>;
 getEvent(key: 'NameUpdated'): TypedContractEvent<NameUpdatedEvent.InputTuple, NameUpdatedEvent.OutputTuple, NameUpdatedEvent.OutputObject>;
 getEvent(key: 'OptionAdded'): TypedContractEvent<OptionAddedEvent.InputTuple, OptionAddedEvent.OutputTuple, OptionAddedEvent.OutputObject>;
-getEvent(key: 'Transfer'): TypedContractEvent<TransferEvent.InputTuple, TransferEvent.OutputTuple, TransferEvent.OutputObject>;
-getEvent(key: 'VoteTokenMinted'): TypedContractEvent<VoteTokenMintedEvent.InputTuple, VoteTokenMintedEvent.OutputTuple, VoteTokenMintedEvent.OutputObject>;
-getEvent(key: 'VoteTokenUsed'): TypedContractEvent<VoteTokenUsedEvent.InputTuple, VoteTokenUsedEvent.OutputTuple, VoteTokenUsedEvent.OutputObject>;
+getEvent(key: 'StakeTokenUsed'): TypedContractEvent<StakeTokenUsedEvent.InputTuple, StakeTokenUsedEvent.OutputTuple, StakeTokenUsedEvent.OutputObject>;
 getEvent(key: 'Voted'): TypedContractEvent<VotedEvent.InputTuple, VotedEvent.OutputTuple, VotedEvent.OutputObject>;
 
     filters: {
       
-      'Approval(address,address,uint256)': TypedContractEvent<ApprovalEvent.InputTuple, ApprovalEvent.OutputTuple, ApprovalEvent.OutputObject>;
-      Approval: TypedContractEvent<ApprovalEvent.InputTuple, ApprovalEvent.OutputTuple, ApprovalEvent.OutputObject>;
-    
-
-      'ApprovalForAll(address,address,bool)': TypedContractEvent<ApprovalForAllEvent.InputTuple, ApprovalForAllEvent.OutputTuple, ApprovalForAllEvent.OutputObject>;
-      ApprovalForAll: TypedContractEvent<ApprovalForAllEvent.InputTuple, ApprovalForAllEvent.OutputTuple, ApprovalForAllEvent.OutputObject>;
-    
-
-      'BaseTokenURISet(string)': TypedContractEvent<BaseTokenURISetEvent.InputTuple, BaseTokenURISetEvent.OutputTuple, BaseTokenURISetEvent.OutputObject>;
-      BaseTokenURISet: TypedContractEvent<BaseTokenURISetEvent.InputTuple, BaseTokenURISetEvent.OutputTuple, BaseTokenURISetEvent.OutputObject>;
-    
-
       'Committed(bytes32,uint256)': TypedContractEvent<CommittedEvent.InputTuple, CommittedEvent.OutputTuple, CommittedEvent.OutputObject>;
       Committed: TypedContractEvent<CommittedEvent.InputTuple, CommittedEvent.OutputTuple, CommittedEvent.OutputObject>;
     
@@ -1076,16 +759,8 @@ getEvent(key: 'Voted'): TypedContractEvent<VotedEvent.InputTuple, VotedEvent.Out
       OptionAdded: TypedContractEvent<OptionAddedEvent.InputTuple, OptionAddedEvent.OutputTuple, OptionAddedEvent.OutputObject>;
     
 
-      'Transfer(address,address,uint256)': TypedContractEvent<TransferEvent.InputTuple, TransferEvent.OutputTuple, TransferEvent.OutputObject>;
-      Transfer: TypedContractEvent<TransferEvent.InputTuple, TransferEvent.OutputTuple, TransferEvent.OutputObject>;
-    
-
-      'VoteTokenMinted(address,uint256)': TypedContractEvent<VoteTokenMintedEvent.InputTuple, VoteTokenMintedEvent.OutputTuple, VoteTokenMintedEvent.OutputObject>;
-      VoteTokenMinted: TypedContractEvent<VoteTokenMintedEvent.InputTuple, VoteTokenMintedEvent.OutputTuple, VoteTokenMintedEvent.OutputObject>;
-    
-
-      'VoteTokenUsed(uint256,bytes32,address)': TypedContractEvent<VoteTokenUsedEvent.InputTuple, VoteTokenUsedEvent.OutputTuple, VoteTokenUsedEvent.OutputObject>;
-      VoteTokenUsed: TypedContractEvent<VoteTokenUsedEvent.InputTuple, VoteTokenUsedEvent.OutputTuple, VoteTokenUsedEvent.OutputObject>;
+      'StakeTokenUsed(uint256,bytes32,address)': TypedContractEvent<StakeTokenUsedEvent.InputTuple, StakeTokenUsedEvent.OutputTuple, StakeTokenUsedEvent.OutputObject>;
+      StakeTokenUsed: TypedContractEvent<StakeTokenUsedEvent.InputTuple, StakeTokenUsedEvent.OutputTuple, StakeTokenUsedEvent.OutputObject>;
     
 
       'Voted(uint8,uint256)': TypedContractEvent<VotedEvent.InputTuple, VotedEvent.OutputTuple, VotedEvent.OutputObject>;

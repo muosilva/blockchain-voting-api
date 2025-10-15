@@ -1,9 +1,10 @@
-﻿import { network } from "hardhat";
+import { network } from "hardhat";
 
 async function main() {
   const { ethers } = await network.connect();
 
-  const [issuer] = await ethers.getSigners();
+  const [issuer, ...rest] = await ethers.getSigners();
+  const voters = rest.slice(0, 4);
 
   const name = "Condominio";
   const options = ["A", "B"];
@@ -12,27 +13,38 @@ async function main() {
   const commitEndAt = startAt + 600;
   const endAt = commitEndAt + 600;
 
-  const baseTokenURI = "https://example.com/metadata/pautas/Condominio/";
+  const stakeBaseURI = "https://example.com/metadata/stake/";
 
-  const factory = await ethers.getContractFactory("TokenizedVoting");
-  const contract = await factory.deploy(
+  const stakeFactory = await ethers.getContractFactory("StakeToken");
+  const stakeToken = await stakeFactory
+    .connect(issuer)
+    .deploy("PoS Stake Token", "PST", stakeBaseURI);
+  await stakeToken.waitForDeployment();
+
+  for (const voter of voters) {
+    const mintTx = await stakeToken.connect(issuer).mint(voter.address);
+    await mintTx.wait();
+  }
+
+  const votingFactory = await ethers.getContractFactory("TokenizedVoting");
+  const votingContract = await votingFactory.deploy(
     name,
     options,
     startAt,
     commitEndAt,
     endAt,
     issuer.address,
-    baseTokenURI
+    await stakeToken.getAddress()
   );
-  await contract.waitForDeployment();
+  await votingContract.waitForDeployment();
 
-  const address = await contract.getAddress();
-  const metadata = await contract.metadata();
-  const [labels] = await contract.optionDetails();
+  const contractAddress = await votingContract.getAddress();
+  const metadata = await votingContract.metadata();
+  const [labels] = await votingContract.optionDetails();
 
-  console.log("TokenizedVoting deployed at:", address);
-  console.log("Version:", Number(await contract.VERSION()));
-  console.log("Base token URI:", await contract.baseTokenURI());
+  console.log("StakeToken deployed at:", await stakeToken.getAddress());
+  console.log("TokenizedVoting deployed at:", contractAddress);
+  console.log("Version:", Number(await votingContract.VERSION()));
   console.log("Metadata:", {
     name: metadata.name,
     issuer: metadata.issuer,
@@ -45,8 +57,8 @@ async function main() {
     optionCount: Number(metadata.optionCount)
   });
   console.log("Options:", labels);
-  console.log("Commit window open?", await contract.isCommitPhase());
-  console.log("Reveal window open?", await contract.isRevealPhase());
+  console.log("Commit window open?", await votingContract.isCommitPhase());
+  console.log("Reveal window open?", await votingContract.isRevealPhase());
 }
 
 main().catch((error) => {

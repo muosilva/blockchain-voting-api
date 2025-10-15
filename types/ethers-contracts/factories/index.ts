@@ -2,4 +2,5 @@
 /* tslint:disable */
 /* eslint-disable */
 export * as simpleVotingSol from './SimpleVoting.sol/index.js';
+export * as stakeTokenSol from './StakeToken.sol/index.js';
 export * as tokenizedVotingSol from './TokenizedVoting.sol/index.js';

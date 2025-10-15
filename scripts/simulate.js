@@ -2,10 +2,24 @@ import { network } from "hardhat";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+async function mineAt(provider, target) {
+  const latest = await provider.send("eth_getBlockByNumber", ["latest", false]);
+  const latestTs = latest?.timestamp ? Number(BigInt(latest.timestamp)) : 0;
+  const nextTs = target <= latestTs ? latestTs + 1 : target;
+  await provider.send("evm_setNextBlockTimestamp", [nextTs]);
+  await provider.send("evm_mine", []);
+  return nextTs;
+}
+
 async function main() {
   const { ethers, provider } = await network.connect();
   const [issuer, ...accounts] = await ethers.getSigners();
   const voters = accounts.slice(0, 5);
+
+  async function blockTimestamp(blockNumber) {
+    const block = await provider.send("eth_getBlockByNumber", [ethers.toBeHex(blockNumber), false]);
+    return block?.timestamp ? Number(BigInt(block.timestamp)) : 0;
+  }
 
   const name = "Condominio";
   const options = ["A", "B"];
@@ -17,39 +31,52 @@ async function main() {
   const commitEndISO = new Date(commitEndAt * 1000).toISOString();
   const endISO = new Date(endAt * 1000).toISOString();
 
-  const baseTokenURI = "https://example.com/metadata/pautas/condominio/";
+  const stakeBaseURI = "https://example.com/metadata/stake/";
 
-  const F = await ethers.getContractFactory("TokenizedVoting");
-  const contract = await F
+  const stakeFactory = await ethers.getContractFactory("StakeToken");
+  const stakeToken = await stakeFactory
     .connect(issuer)
-    .deploy(name, options, startAt, commitEndAt, endAt, issuer.address, baseTokenURI);
+    .deploy("PoS Stake Token", "PST", stakeBaseURI);
+  await stakeToken.waitForDeployment();
+  const stakeTokenAddress = await stakeToken.getAddress();
+
+  console.log("Stake token deployed at:", stakeTokenAddress);
+
+  const allocations = [];
+  for (const voter of voters) {
+    const nextId = await stakeToken.nextTokenId();
+    const mintTx = await stakeToken.connect(issuer).mint(voter.address);
+    await mintTx.wait();
+    allocations.push({ owner: voter.address, tokenId: nextId });
+    console.log(`Mint stake token ${nextId} -> ${voter.address}`);
+  }
+
+  const votingFactory = await ethers.getContractFactory("TokenizedVoting");
+  const contract = await votingFactory.deploy(
+    name,
+    options,
+    startAt,
+    commitEndAt,
+    endAt,
+    issuer.address,
+    stakeTokenAddress
+  );
   await contract.waitForDeployment();
   const contractAddress = await contract.getAddress();
 
-  console.log("Deploy:", contractAddress);
+  console.log("Voting contract deployed at:", contractAddress);
   console.log("Issuer (credential authority):", issuer.address);
-  console.log("Base token URI:", baseTokenURI);
 
   const plan = voters.map((signer, idx) => ({
     signer,
     optionIndex: idx < 3 ? 0 : 1,
     label: idx + 1,
-    tokenId: 0n
+    tokenId: allocations[idx]?.tokenId ?? 0n
   }));
-
-  for (const entry of plan) {
-    const mintTx = await contract.connect(issuer).mintVoteToken(entry.signer.address);
-    const mintReceipt = await mintTx.wait();
-    const mintedLog = mintReceipt.logs.find((log) => log.fragment?.name === "VoteTokenMinted");
-    const tokenId = mintedLog?.args?.tokenId ?? (await contract.nextTokenId()) - 1n;
-    entry.tokenId = tokenId;
-    console.log(`Mint vote token ${tokenId} for voter ${entry.signer.address}`);
-  }
 
   const voteRecords = [];
 
-  await provider.send("evm_setNextBlockTimestamp", [startAt + 1]);
-  await provider.send("evm_mine", []);
+  await mineAt(provider, startAt + 1);
 
   for (const entry of plan) {
     const voter = entry.signer;
@@ -71,6 +98,8 @@ async function main() {
       .commitVoteWithToken(entry.tokenId, credentialHash, commitment, signature);
     const commitReceipt = await commitTx.wait();
 
+    const commitTimestamp = await blockTimestamp(commitReceipt.blockNumber);
+
     entry.salt = salt;
     entry.commitment = commitment;
     entry.credentialSecret = credentialSecret;
@@ -78,17 +107,24 @@ async function main() {
     entry.credentialSignature = signature;
     entry.commitTx = commitReceipt.hash;
     entry.commitCaller = voter.address;
+    entry.commitTimestamp = commitTimestamp;
+    entry.commitISO = commitTimestamp ? new Date(commitTimestamp * 1000).toISOString() : null;
 
-    console.log(`Commit credential ${credentialHash} -> option ${entry.optionIndex}`);
+    console.log(
+      `Commit credential ${credentialHash} with stake token ${entry.tokenId} -> option ${entry.optionIndex}`
+    );
   }
 
-  await provider.send("evm_setNextBlockTimestamp", [commitEndAt + 1]);
-  await provider.send("evm_mine", []);
+  await mineAt(provider, commitEndAt + 1);
 
   for (const entry of plan) {
     const voter = entry.signer;
-    const revealTx = await contract.connect(voter).revealVote(entry.credentialHash, entry.optionIndex, entry.salt);
+    const revealTx = await contract
+      .connect(voter)
+      .revealVote(entry.credentialHash, entry.optionIndex, entry.salt);
     const revealReceipt = await revealTx.wait();
+
+    const revealTimestamp = await blockTimestamp(revealReceipt.blockNumber);
 
     const credentialDigest = await contract.credentialDigest(entry.credentialHash);
 
@@ -97,7 +133,7 @@ async function main() {
       voteToken: entry.commitment,
       voterToken: entry.credentialHash,
       voto: options[entry.optionIndex],
-      tokenId: entry.tokenId.toString(),
+      stakeTokenId: entry.tokenId.toString(),
       start: startISO,
       end: endISO,
       commitTx: entry.commitTx,
@@ -105,7 +141,13 @@ async function main() {
       credentialSecret: entry.credentialSecret,
       credentialSignature: entry.credentialSignature,
       salt: entry.salt,
-      credentialDigest
+      credentialDigest,
+      optionIndex: entry.optionIndex,
+      commitCaller: entry.commitCaller,
+      commitTimestamp: entry.commitTimestamp,
+      commitISO: entry.commitISO,
+      revealTimestamp,
+      revealISO: revealTimestamp ? new Date(revealTimestamp * 1000).toISOString() : null
     });
 
     console.log(`Reveal credential ${entry.credentialHash} -> option ${entry.optionIndex}`);
@@ -120,7 +162,13 @@ async function main() {
   console.log("\nTally:");
   optionLabels.forEach((label, i) => console.log(`- [${i}] ${label}: ${Number(optionCounts[i])}`));
   console.log("Total:", Number(await contract.totalVotes()));
-  console.log(hasTie ? "Tie" : `Winner: [${Number(leadingIndex)}] ${optionLabels[Number(leadingIndex)]} with ${Number(leadingVotes)} votes`);
+  console.log(
+    hasTie
+      ? "Tie"
+      : `Winner: [${Number(leadingIndex)}] ${optionLabels[Number(leadingIndex)]} with ${Number(
+          leadingVotes
+        )} votes`
+  );
 
   const outputPath = path.resolve(process.cwd(), "cache", "simulate-result.json");
   await mkdir(path.dirname(outputPath), { recursive: true });
@@ -130,6 +178,11 @@ async function main() {
       {
         generatedAt: new Date().toISOString(),
         contractAddress,
+        stakeTokenAddress,
+        stakeAllocations: allocations.map((item) => ({
+          owner: item.owner,
+          tokenId: item.tokenId.toString()
+        })),
         network: {
           chainId: Number(networkInfo.chainId),
           name: networkInfo.name
