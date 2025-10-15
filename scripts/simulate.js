@@ -1,6 +1,7 @@
 import { network } from "hardhat";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { DEFAULT_CONFIG_PATH, parseArgs } from "./lib/sim-cli.js";
 
 async function mineAt(provider, target) {
   const latest = await provider.send("eth_getBlockByNumber", ["latest", false]);
@@ -14,6 +15,11 @@ async function mineAt(provider, target) {
 async function main() {
   const args = parseArgs(process.argv);
   const configPath = args.configPath ?? DEFAULT_CONFIG_PATH;
+  const connection = await network.connect(args.networkName);
+  const { ethers, provider: connectedProvider } = connection;
+  const provider = connectedProvider ?? ethers.provider;
+  const [issuer, ...restSigners] = await ethers.getSigners();
+  const voters = restSigners.slice(0, 4);
 
   async function blockTimestamp(blockNumber) {
     const block = await provider.send("eth_getBlockByNumber", [ethers.toBeHex(blockNumber), false]);
