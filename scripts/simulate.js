@@ -12,9 +12,8 @@ async function mineAt(provider, target) {
 }
 
 async function main() {
-  const { ethers, provider } = await network.connect();
-  const [issuer, ...accounts] = await ethers.getSigners();
-  const voters = accounts.slice(0, 5);
+  const args = parseArgs(process.argv);
+  const configPath = args.configPath ?? DEFAULT_CONFIG_PATH;
 
   async function blockTimestamp(blockNumber) {
     const block = await provider.send("eth_getBlockByNumber", [ethers.toBeHex(blockNumber), false]);
@@ -149,8 +148,6 @@ async function main() {
       revealTimestamp,
       revealISO: revealTimestamp ? new Date(revealTimestamp * 1000).toISOString() : null
     });
-
-    console.log(`Reveal credential ${entry.credentialHash} -> option ${entry.optionIndex}`);
   }
 
   const metadata = await contract.metadata();
