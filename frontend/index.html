@@ -1469,7 +1469,7 @@
             .filter(Boolean);
           if (!lines.length) {
             state.pautas = [];
-            renderPautas();
+            setActivePauta(null);
             sourcesStatus.textContent = "Nenhuma fonte configurada.";
             return;
           }
@@ -1487,10 +1487,16 @@
             }
           }
           state.pautas = results;
-          renderPautas();
+          const previousId = state.selectedPautaId;
+          let nextId = null;
+          if (previousId && results.some((item) => item.id === previousId)) {
+            nextId = previousId;
+          } else if (results.length) {
+            nextId = results[0].id;
+          }
+          setActivePauta(nextId);
           sourcesStatus.textContent = `${ok} fonte(s) carregada(s).`;
           localStorage.setItem(STORAGE_KEYS.sources, sourcesTextarea.value);
-          await updateTokenUsage();
         }
 
         loadSourcesBtn.addEventListener("click", loadSources);
