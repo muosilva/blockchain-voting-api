@@ -58,11 +58,7 @@ contract TokenizedVoting is SimpleVoting {
     ) external {
         address owner = stakeToken.ownerOf(tokenId);
         if (owner != msg.sender) {
-            bool approvedForAll = stakeToken.isApprovedForAll(owner, msg.sender);
-            address approved = stakeToken.getApproved(tokenId);
-            if (!approvedForAll && approved != msg.sender) {
-                revert TokenNotOwned(tokenId, owner, msg.sender);
-            }
+            revert TokenNotOwned(tokenId, owner, msg.sender);
         }
         if (_tokenUsed[tokenId]) revert TokenAlreadyUsed(tokenId);
 

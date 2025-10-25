@@ -1534,9 +1534,13 @@
             return;
           }
           try {
+            if (!state.wallet || !state.wallet.address) {
+              commitFeedback.textContent = "Conecte a carteira para gerar o commitment (vinculado ao seu endereco).";
+              return;
+            }
             const commitment = solidityPackedKeccak256(
-              ["bytes32", "uint8", "bytes32"],
-              [credentialHash, optionIndex, salt]
+              ["bytes32", "uint8", "bytes32", "address"],
+              [credentialHash, optionIndex, salt, state.wallet.address]
             );
             commitmentInput.value = commitment;
             commitFeedback.textContent = "Commitment calculado localmente.";
@@ -1583,8 +1587,8 @@
               return;
             }
             commitment = solidityPackedKeccak256(
-              ["bytes32", "uint8", "bytes32"],
-              [credentialHash, optionIndex, salt]
+              ["bytes32", "uint8", "bytes32", "address"],
+              [credentialHash, optionIndex, salt, state.wallet.address]
             );
             commitmentInput.value = commitment;
           }

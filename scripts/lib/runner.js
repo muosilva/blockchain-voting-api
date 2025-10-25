@@ -192,7 +192,10 @@ export async function runSimulation(simulation, env) {
     const salt = ethers.hexlify(ethers.randomBytes(32));
     const credentialSecret = ethers.hexlify(ethers.randomBytes(32));
     const credentialHash = ethers.keccak256(credentialSecret);
-    const commitment = ethers.solidityPackedKeccak256(["bytes32", "uint8", "bytes32"], [credentialHash, entry.optionIndex, salt]);
+    const commitment = ethers.solidityPackedKeccak256(
+      ["bytes32", "uint8", "bytes32", "address"],
+      [credentialHash, entry.optionIndex, salt, voterAddress]
+    );
     const msgHash = ethers.solidityPackedKeccak256(["string", "bytes32"], ["SimpleVoting:", credentialHash]);
     const signature = await issuer.signMessage(ethers.getBytes(msgHash));
 

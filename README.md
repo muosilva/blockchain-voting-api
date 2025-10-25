@@ -17,13 +17,13 @@ Sistema de votacao totalmente on-chain construido em Solidity com Hardhat. A arq
    - Os tokens podem ser transferidos livremente ate o commit; o novo dono assume o direito de votar naquela pauta.
 
 3. **Commit (on-chain)**
-   - Entre `startAt` e `commitEndAt`, o eleitor calcula `commitment = keccak256(credentialHash, optionIndex, salt)`.
-   - Ele chama `commitVoteWithToken(tokenId, credentialHash, commitment, signature)`.
-   - O contrato verifica a assinatura da autoridade, confere que o chamador e dono (ou aprovado) do token e armazena somente o hash do voto.
+   - Entre `startAt` e `commitEndAt`, o eleitor calcula `commitment = keccak256(credentialHash, optionIndex, salt, committer)` onde `committer` é o endereço do próprio remetente (`msg.sender`).
+   - Ele chama `commitVoteWithToken(tokenId, credentialHash, commitment, signature)` a partir da carteira do dono do token.
+   - O contrato verifica a assinatura da autoridade, confere que o chamador é o dono do token (sem operadores/aproved), vincula o compromisso ao remetente e armazena apenas o hash do voto.
 
 4. **Reveal (on-chain)**
    - Entre `commitEndAt` e `endAt`, o eleitor chama `revealVote(credentialHash, optionIndex, salt)`.
-   - O contrato recomputa o compromisso, valida e incrementa o contador da opcao escolhida.
+   - O contrato recomputa o compromisso incluindo o endereço do remetente que efetuou o commit e valida antes de contar o voto.
 
 5. **Finalizacao**
    - Após `endAt`, qualquer conta pode chamar `finalize()` para emitir o evento `Finalized` com o resultado.
@@ -158,9 +158,9 @@ O script realiza o deploy de `StakeToken` + `TokenizedVoting` na rede `localhost
 ### SimpleVoting.sol
 
 - `commitVote(bytes32 credentialHash, bytes32 commitment, bytes signature)`  
-  Valida a assinatura da autoridade, verifica janelas e registra o compromisso. Na implementacao base o peso de cada voto e 1.
+  Valida a assinatura da autoridade, verifica janelas e registra o compromisso já atrelado ao endereço do remetente.
 - `revealVote(bytes32 credentialHash, uint8 optionIndex, bytes32 salt)`  
-  Recalcula o hash, confere e incrementa o contador da opcao escolhida.
+  Recalcula o hash com `(credentialHash, optionIndex, salt, committer)` e incrementa o contador da opção escolhida.
 - `revokeCredential` / `restoreCredential`  
   Permite invalidar credenciais nao utilizadas caso o emissor detecte abuso.
 - `metadata()`, `optionDetails()`, `ballotOf()`  
@@ -180,7 +180,7 @@ O script realiza o deploy de `StakeToken` + `TokenizedVoting` na rede `localhost
 - `stakeTokenAddress()`  
   Retorna o endereco do contrato `StakeToken` utilizado como requisito de participacao.
 - `commitVoteWithToken(uint256 tokenId, bytes32 credentialHash, bytes32 commitment, bytes signature)`  
-  Combina a verificacao do token ERC-721 externo (dono ou operador aprovado) com a logica de credencial cega do `SimpleVoting`.
+  Apenas o dono do token pode realizar commit; operadores/aprovações não são aceitos. O método integra a autorização por token ao fluxo de credencial cega do `SimpleVoting`.
 - `tokenUsed(uint256 tokenId)`  
   Indica se o token de stake ja teve commit registrado (evita reuso na mesma pauta).
 

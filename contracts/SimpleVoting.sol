@@ -59,6 +59,7 @@ contract SimpleVoting {
         bytes32 commitment;
         bool revealed;
         uint96 weight;
+        address committer;
     }
 
     struct ElectionMetadata {
@@ -110,7 +111,7 @@ contract SimpleVoting {
 
     /// @notice Register a vote commitment during the commit window.
     /// @param credentialHash Blind credential hash representing the voter.
-    /// @param commitment Hash computed via keccak256(credentialHash, optionIndex, salt).
+    /// @param commitment Hash computed via keccak256(credentialHash, optionIndex, salt, committer).
     /// @param signature Signature issued by the credential authority over credentialHash.
     function commitVote(bytes32 credentialHash, bytes32 commitment, bytes calldata signature) public virtual {
         uint256 t = _enforceCommitPhase();
@@ -127,6 +128,7 @@ contract SimpleVoting {
 
         ballot.commitment = commitment;
         ballot.weight = 1;
+        ballot.committer = msg.sender;
         emit Committed(commitment, t);
     }
 
@@ -144,7 +146,7 @@ contract SimpleVoting {
         if (commitment == bytes32(0)) revert NoCommitment();
         if (ballot.revealed) revert AlreadyRevealed();
 
-        bytes32 computed = keccak256(abi.encodePacked(credentialHash, optionIndex, salt));
+        bytes32 computed = keccak256(abi.encodePacked(credentialHash, optionIndex, salt, ballot.committer));
         if (computed != commitment) revert InvalidReveal();
 
         ballot.revealed = true;
@@ -292,9 +294,13 @@ contract SimpleVoting {
         return _credentialSignDigest(credentialHash);
     }
 
-    function computeCommitment(bytes32 credentialHash, uint8 optionIndex, bytes32 salt) external pure returns (bytes32) {
+    function computeCommitment(bytes32 credentialHash, uint8 optionIndex, bytes32 salt, address committer)
+        external
+        pure
+        returns (bytes32)
+    {
         if (salt == bytes32(0)) revert InvalidSalt();
-        return keccak256(abi.encodePacked(credentialHash, optionIndex, salt));
+        return keccak256(abi.encodePacked(credentialHash, optionIndex, salt, committer));
     }
 
     function ballotOf(bytes32 credentialHash) external view returns (bytes32 commitment, bool revealed) {

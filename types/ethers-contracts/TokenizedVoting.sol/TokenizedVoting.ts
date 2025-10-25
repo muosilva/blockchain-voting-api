@@ -25,7 +25,7 @@ encodeFunctionData(functionFragment: 'ballotWeight', values: [BytesLike]): strin
 encodeFunctionData(functionFragment: 'commitEndAt', values?: undefined): string;
 encodeFunctionData(functionFragment: 'commitVote', values: [BytesLike, BytesLike, BytesLike]): string;
 encodeFunctionData(functionFragment: 'commitVoteWithToken', values: [BigNumberish, BytesLike, BytesLike, BytesLike]): string;
-encodeFunctionData(functionFragment: 'computeCommitment', values: [BytesLike, BigNumberish, BytesLike]): string;
+encodeFunctionData(functionFragment: 'computeCommitment', values: [BytesLike, BigNumberish, BytesLike, AddressLike]): string;
 encodeFunctionData(functionFragment: 'credentialDigest', values: [BytesLike]): string;
 encodeFunctionData(functionFragment: 'currentPhase', values?: undefined): string;
 encodeFunctionData(functionFragment: 'endAt', values?: undefined): string;
@@ -292,7 +292,7 @@ decodeFunctionResult(functionFragment: 'verifyCredential', data: BytesLike): Res
 
     
     computeCommitment: TypedContractMethod<
-      [credentialHash: BytesLike, optionIndex: BigNumberish, salt: BytesLike, ],
+      [credentialHash: BytesLike, optionIndex: BigNumberish, salt: BytesLike, committer: AddressLike, ],
       [string],
       'view'
     >
@@ -574,7 +574,7 @@ getFunction(nameOrSignature: 'commitVoteWithToken'): TypedContractMethod<
       'nonpayable'
     >;
 getFunction(nameOrSignature: 'computeCommitment'): TypedContractMethod<
-      [credentialHash: BytesLike, optionIndex: BigNumberish, salt: BytesLike, ],
+      [credentialHash: BytesLike, optionIndex: BigNumberish, salt: BytesLike, committer: AddressLike, ],
       [string],
       'view'
     >;
