@@ -14,7 +14,8 @@ contract TokenizedVoting is SimpleVoting {
     error UseCommitWithToken();
 
     // ======== Events ========
-    event StakeTokenUsed(uint256 indexed tokenId, bytes32 indexed credentialHash, address indexed caller);
+    // Privacy: avoid emitting credentialHash/caller alongside tokenId to reduce linkability in logs
+    event StakeTokenUsed(uint256 indexed tokenId);
 
     // ======== State ========
     IERC721 public immutable stakeToken;
@@ -64,6 +65,6 @@ contract TokenizedVoting is SimpleVoting {
 
         super.commitVote(credentialHash, commitment, signature);
         _tokenUsed[tokenId] = true;
-        emit StakeTokenUsed(tokenId, credentialHash, msg.sender);
+        emit StakeTokenUsed(tokenId);
     }
 }
