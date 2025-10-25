@@ -170,9 +170,9 @@ decodeFunctionResult(functionFragment: 'verifyCredential', data: BytesLike): Res
   
 
     export namespace StakeTokenUsedEvent {
-      export type InputTuple = [tokenId: BigNumberish, credentialHash: BytesLike, caller: AddressLike];
-      export type OutputTuple = [tokenId: bigint, credentialHash: string, caller: string];
-      export interface OutputObject {tokenId: bigint, credentialHash: string, caller: string };
+      export type InputTuple = [tokenId: BigNumberish];
+      export type OutputTuple = [tokenId: bigint];
+      export interface OutputObject {tokenId: bigint };
       export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
       export type Filter = TypedDeferredTopicFilter<Event>
       export type Log = TypedEventLog<Event>
@@ -759,7 +759,7 @@ getEvent(key: 'Voted'): TypedContractEvent<VotedEvent.InputTuple, VotedEvent.Out
       OptionAdded: TypedContractEvent<OptionAddedEvent.InputTuple, OptionAddedEvent.OutputTuple, OptionAddedEvent.OutputObject>;
     
 
-      'StakeTokenUsed(uint256,bytes32,address)': TypedContractEvent<StakeTokenUsedEvent.InputTuple, StakeTokenUsedEvent.OutputTuple, StakeTokenUsedEvent.OutputObject>;
+      'StakeTokenUsed(uint256)': TypedContractEvent<StakeTokenUsedEvent.InputTuple, StakeTokenUsedEvent.OutputTuple, StakeTokenUsedEvent.OutputObject>;
       StakeTokenUsed: TypedContractEvent<StakeTokenUsedEvent.InputTuple, StakeTokenUsedEvent.OutputTuple, StakeTokenUsedEvent.OutputObject>;
     
 
