@@ -8,6 +8,7 @@ yarn-error.log*
 artifacts/
 cache/
 typechain/
+types/
 coverage/
 
 # Ambiente
