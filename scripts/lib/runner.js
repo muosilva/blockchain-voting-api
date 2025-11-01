@@ -58,9 +58,120 @@ export async function runSimulation(simulation, env) {
   const endISO = new Date(endAt * 1000).toISOString();
 
   const contractName = simulation.contractName ?? "SimpleVoting";
+
+  const tokenConfig = simulation.token ?? null;
+  let stakeToken = null;
+  let stakeTokenAddress = null;
+  const tokenMints = [];
+  const tokenTransfers = [];
+
+  const resolveSignerByRef = (ref) => {
+    if (ref === undefined || ref === null) return null;
+    if (typeof ref === "number") {
+      const info = signerInfos[ref];
+      if (!info) throw new Error(`accountIndex ${ref} nao encontrado para referencia de transferencia.`);
+      return info;
+    }
+    if (typeof ref === "string") {
+      const match = signerInfos.find((i) => i.address.toLowerCase() === ref.toLowerCase());
+      if (!match) throw new Error(`Endereco ${ref} nao encontrado para referencia de transferencia.`);
+      return match;
+    }
+    return null;
+  };
+
+  const wantsTokenSupport = !!tokenConfig || contractName === "TokenizedVoting";
+
+  if (wantsTokenSupport) {
+    if (tokenConfig?.address) {
+      stakeTokenAddress = tokenConfig.address;
+      stakeToken = await ethers.getContractAt("StakeToken", stakeTokenAddress);
+    } else {
+      const stakeFactory = await ethers.getContractFactory("StakeToken");
+      const stakeName = tokenConfig?.name ?? "PoS Stake Token";
+      const stakeSymbol = tokenConfig?.symbol ?? "PST";
+      const stakeBaseURI = tokenConfig?.baseURI ?? "https://example.com/metadata/stake/";
+      stakeToken = await stakeFactory.connect(issuer).deploy(stakeName, stakeSymbol, stakeBaseURI);
+      await stakeToken.waitForDeployment();
+      stakeTokenAddress = await stakeToken.getAddress();
+      console.log("StakeToken deploy:", stakeTokenAddress);
+    }
+
+    const uniquePlanAccounts = Array.from(new Set(plan.map((p) => p.accountAddress)));
+    const mintsConfig = Array.isArray(tokenConfig?.mintTo) ? tokenConfig.mintTo : [];
+    const mintsPerVoter = Number.isFinite(tokenConfig?.mintsPerVoter) ? tokenConfig.mintsPerVoter : 1;
+
+    if (mintsConfig.length > 0) {
+      for (const entry of mintsConfig) {
+        let toInfo;
+        if (typeof entry === "number") toInfo = resolveSignerByRef(entry);
+        else if (typeof entry === "string") toInfo = resolveSignerByRef(entry);
+        else if (typeof entry === "object") toInfo = resolveSignerByRef(entry.accountIndex ?? entry.address);
+        else throw new Error("Entrada invalida em token.mintTo.");
+        const mintTx = await stakeToken.connect(issuer).mint(toInfo.address);
+        const receipt = await mintTx.wait();
+        const nextId = await stakeToken.nextTokenId();
+        const mintedId = Number(nextId) - 1;
+        tokenMints.push({ to: toInfo.address, tokenId: mintedId, txHash: receipt?.hash });
+        console.log(`Minted tokenId ${mintedId} to ${toInfo.address}`);
+      }
+    } else if (contractName === "TokenizedVoting" || tokenConfig?.useForVoting) {
+      for (const addr of uniquePlanAccounts) {
+        for (let i = 0; i < mintsPerVoter; i += 1) {
+          const mintTx = await stakeToken.connect(issuer).mint(addr);
+          const receipt = await mintTx.wait();
+          const nextId = await stakeToken.nextTokenId();
+          const mintedId = Number(nextId) - 1;
+          tokenMints.push({ to: addr, tokenId: mintedId, txHash: receipt?.hash });
+          if (i === 0) console.log(`Minted tokenId ${mintedId} to ${addr}`);
+        }
+      }
+    }
+
+    if (Array.isArray(tokenConfig?.transfers) && tokenConfig.transfers.length > 0) {
+      for (const t of tokenConfig.transfers) {
+        const fromRef = t.fromIndex ?? t.from ?? t.fromAddress;
+        const toRef = t.toIndex ?? t.to ?? t.toAddress;
+        const fromInfo = resolveSignerByRef(fromRef);
+        const toInfo = resolveSignerByRef(toRef);
+        if (!fromInfo || !toInfo) throw new Error("Transferencia invalida: from/to ausentes.");
+
+        let tokenId = t.tokenId;
+        if (!Number.isFinite(tokenId)) {
+          const owned = await stakeToken.tokensOfOwner(fromInfo.address);
+          if (!owned || owned.length === 0) {
+            const mintTx = await stakeToken.connect(issuer).mint(fromInfo.address);
+            await mintTx.wait();
+            const nextId = await stakeToken.nextTokenId();
+            tokenId = Number(nextId) - 1;
+          } else {
+            tokenId = Number(owned[0]);
+          }
+        }
+
+        const transferTx = await stakeToken
+          .connect(fromInfo.signer)["safeTransferFrom(address,address,uint256)"](fromInfo.address, toInfo.address, tokenId);
+        const receipt = await transferTx.wait();
+        tokenTransfers.push({ from: fromInfo.address, to: toInfo.address, tokenId, txHash: receipt?.hash });
+        console.log(`Transferred tokenId ${tokenId} from ${fromInfo.address} to ${toInfo.address}`);
+      }
+    }
+  }
+
+  const usedTokenIdsByAddress = new Map();
+
   let deployArgs = simulation.deployArgs;
   if (!Array.isArray(deployArgs)) {
-    deployArgs = [simulation.name ?? label, simulation.options, startAt, commitEndAt, endAt, issuerAddress];
+    if (contractName === "TokenizedVoting") {
+      if (!stakeTokenAddress) {
+        throw new Error(
+          "TokenizedVoting requer um StakeToken. Defina simulation.token ou forneca token.address para usar um existente."
+        );
+      }
+      deployArgs = [simulation.name ?? label, simulation.options, startAt, commitEndAt, endAt, issuerAddress, stakeTokenAddress];
+    } else {
+      deployArgs = [simulation.name ?? label, simulation.options, startAt, commitEndAt, endAt, issuerAddress];
+    }
   }
 
   const factory = await ethers.getContractFactory(contractName);
@@ -85,14 +196,39 @@ export async function runSimulation(simulation, env) {
     const msgHash = ethers.solidityPackedKeccak256(["string", "bytes32"], ["SimpleVoting:", credentialHash]);
     const signature = await issuer.signMessage(ethers.getBytes(msgHash));
 
-    const commitTx = await contract.connect(voter).commitVote(credentialHash, commitment, signature);
-    await commitTx.wait();
+    if (contractName === "TokenizedVoting") {
+      const ownedRaw = await stakeToken.tokensOfOwner(voterAddress);
+      const owned = (ownedRaw || []).map((v) => Number(v));
+      if (!owned || owned.length === 0) {
+        throw new Error(`Conta ${voterAddress} nao possui token de stake para commit.`);
+      }
+      const usedSet = usedTokenIdsByAddress.get(voterAddress) ?? new Set();
+      const tokenId = owned.find((id) => !usedSet.has(id));
+      if (!Number.isFinite(tokenId)) {
+        throw new Error(`Conta ${voterAddress} nao possui token de stake livre para um segundo commit.`);
+      }
+      const commitTx = await contract
+        .connect(voter)
+        .commitVoteWithToken(tokenId, credentialHash, commitment, signature);
+      await commitTx.wait();
 
-    entry.salt = salt;
-    entry.commitment = commitment;
-    entry.credentialHash = credentialHash;
+      entry.salt = salt;
+      entry.commitment = commitment;
+      entry.credentialHash = credentialHash;
+      entry.tokenId = tokenId;
+      usedSet.add(tokenId);
+      usedTokenIdsByAddress.set(voterAddress, usedSet);
+      console.log(`Commit credential ${credentialHash} com tokenId ${tokenId} (conta ${voterAddress})`);
+    } else {
+      const commitTx = await contract.connect(voter).commitVote(credentialHash, commitment, signature);
+      await commitTx.wait();
 
-    console.log(`Commit credential ${credentialHash} (conta ${voterAddress})`);
+      entry.salt = salt;
+      entry.commitment = commitment;
+      entry.credentialHash = credentialHash;
+
+      console.log(`Commit credential ${credentialHash} (conta ${voterAddress})`);
+    }
   }
 
   await moveToTimestamp(provider, commitEndAt + 1, { phase: "reveal", label });
@@ -103,11 +239,12 @@ export async function runSimulation(simulation, env) {
     const revealTx = await contract.connect(voter).revealVote(entry.credentialHash, entry.optionIndex, entry.salt);
     await revealTx.wait();
 
-    // Registro minimizado para privacidade: apenas associacao entre tokens
-    voteRecords.push({
+    const record = {
       voterToken: entry.credentialHash,
       voteToken: entry.commitment,
-    });
+    };
+    if (Number.isFinite(entry.tokenId)) record.tokenId = entry.tokenId;
+    voteRecords.push(record);
 
     console.log(`Reveal credential ${entry.credentialHash} (conta ${revealAddress})`);
   }
@@ -146,6 +283,13 @@ export async function runSimulation(simulation, env) {
           },
         },
         contractAddress,
+        token: stakeTokenAddress
+          ? {
+              stakeTokenAddress,
+              mints: tokenMints,
+              transfers: tokenTransfers,
+            }
+          : null,
         network: {
           chainId: Number(networkInfo.chainId),
           name: networkInfo.name,

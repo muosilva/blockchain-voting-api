@@ -46,7 +46,7 @@ contract SimpleVoting {
     // ======== State ========
     address public immutable owner;        // contract administrator
     address public immutable issuer;       // authority that signs credentials
-    string public name;                    // proposal label
+    string public proposalName;            // proposal label
     string[] private _options;             // voting options
     uint256 public immutable startAt;      // commit window start (unix)
     uint256 public immutable commitEndAt;  // commit window end (unix)
@@ -58,6 +58,7 @@ contract SimpleVoting {
     struct Ballot {
         bytes32 commitment;
         bool revealed;
+        uint96 weight;
     }
 
     struct ElectionMetadata {
@@ -73,7 +74,7 @@ contract SimpleVoting {
         uint256 totalVotes;
     }
 
-    mapping(bytes32 => Ballot) private _ballots; // credential hash => ballot
+    mapping(bytes32 => Ballot) internal _ballots; // credential hash => ballot
     mapping(bytes32 => bool) private _revoked;    // credential hash => revoked flag
 
     bool public finalized;
@@ -94,7 +95,7 @@ contract SimpleVoting {
 
         owner = msg.sender;
         issuer = _issuer;
-        name = _name;
+        proposalName = _name;
         startAt = _startAt;
         commitEndAt = _commitEndAt;
         endAt = _endAt;
@@ -111,7 +112,7 @@ contract SimpleVoting {
     /// @param credentialHash Blind credential hash representing the voter.
     /// @param commitment Hash computed via keccak256(credentialHash, optionIndex, salt).
     /// @param signature Signature issued by the credential authority over credentialHash.
-    function commitVote(bytes32 credentialHash, bytes32 commitment, bytes calldata signature) external {
+    function commitVote(bytes32 credentialHash, bytes32 commitment, bytes calldata signature) public virtual {
         uint256 t = _enforceCommitPhase();
         if (credentialHash == bytes32(0)) revert InvalidCredentialHash();
         if (commitment == bytes32(0)) revert ZeroCommitment();
@@ -125,6 +126,7 @@ contract SimpleVoting {
         if (recovered != issuer) revert InvalidCredentialSignature();
 
         ballot.commitment = commitment;
+        ballot.weight = 1;
         emit Committed(commitment, t);
     }
 
@@ -132,7 +134,7 @@ contract SimpleVoting {
     /// @param credentialHash Blind credential associated with the commitment.
     /// @param optionIndex Index of the chosen option.
     /// @param salt Random salt used at commit time.
-    function revealVote(bytes32 credentialHash, uint8 optionIndex, bytes32 salt) external {
+    function revealVote(bytes32 credentialHash, uint8 optionIndex, bytes32 salt) public virtual {
         uint256 t = _enforceRevealPhase();
         if (optionIndex >= _options.length) revert InvalidOption();
         if (salt == bytes32(0)) revert InvalidSalt();
@@ -146,7 +148,8 @@ contract SimpleVoting {
         if (computed != commitment) revert InvalidReveal();
 
         ballot.revealed = true;
-        _tally[optionIndex] += 1;
+        uint96 weight = ballot.weight;
+        _tally[optionIndex] += weight == 0 ? 1 : weight;
         emit Voted(optionIndex, t);
     }
 
@@ -243,7 +246,7 @@ contract SimpleVoting {
 
     function metadata() external view returns (ElectionMetadata memory summary) {
         summary = ElectionMetadata({
-            name: name,
+            name: proposalName,
             owner: owner,
             issuer: issuer,
             startAt: startAt,
@@ -266,6 +269,11 @@ contract SimpleVoting {
         commitment = ballot.commitment;
         revealed = ballot.revealed;
         revoked = _revoked[credentialHash];
+    }
+
+    function ballotWeight(bytes32 credentialHash) external view returns (uint256) {
+        uint96 weight = _ballots[credentialHash].weight;
+        return weight == 0 ? 1 : weight;
     }
 
     function isCredentialRevoked(bytes32 credentialHash) external view returns (bool) {
@@ -321,7 +329,7 @@ contract SimpleVoting {
     function setName(string calldata newName) external onlyOwner {
         _enforceBeforeStart();
         if (bytes(newName).length == 0) revert EmptyName();
-        name = newName;
+        proposalName = newName;
         emit NameUpdated(newName);
     }
 
