@@ -58,9 +58,28 @@ export async function runSimulation(simulation, env) {
   const endISO = new Date(endAt * 1000).toISOString();
 
   const contractName = simulation.contractName ?? "SimpleVoting";
+  const tokenConfig = simulation.token ?? {};
+  const isTokenizedVoting = contractName === "TokenizedVoting";
+
+  let stakeToken = null;
+  let stakeTokenAddress = null;
+
+  if (isTokenizedVoting) {
+    const stakeFactory = await ethers.getContractFactory("StakeToken");
+    const tokenName = tokenConfig.name ?? `${simulation.name ?? label} Stake Token`;
+    const tokenSymbol = tokenConfig.symbol ?? "STK";
+    const baseUri = tokenConfig.baseURI ?? "";
+    stakeToken = await stakeFactory.connect(issuer).deploy(tokenName, tokenSymbol, baseUri);
+    await stakeToken.waitForDeployment();
+    stakeTokenAddress = await stakeToken.getAddress();
+    console.log("Stake token:", stakeTokenAddress);
+  }
+
   let deployArgs = simulation.deployArgs;
   if (!Array.isArray(deployArgs)) {
-    deployArgs = [simulation.name ?? label, simulation.options, startAt, commitEndAt, endAt, issuerAddress];
+    deployArgs = isTokenizedVoting
+      ? [simulation.name ?? label, simulation.options, startAt, commitEndAt, endAt, issuerAddress, stakeTokenAddress]
+      : [simulation.name ?? label, simulation.options, startAt, commitEndAt, endAt, issuerAddress];
   }
 
   const factory = await ethers.getContractFactory(contractName);
@@ -73,6 +92,95 @@ export async function runSimulation(simulation, env) {
 
   const voteRecords = [];
 
+  const resolveAccountAddress = (value) => {
+    if (typeof value !== "string") return null;
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === "0x...") return null;
+    if (trimmed.startsWith("0x") && trimmed.length >= 10) {
+      const match = signerInfos.find((info) => info.address.toLowerCase() === trimmed.toLowerCase());
+      return match ? match.address : trimmed;
+    }
+    const planMatch = plan.find((entry) => typeof entry.label === "string" && entry.label.toLowerCase() === trimmed.toLowerCase());
+    if (planMatch) return planMatch.accountAddress;
+
+    const eleitorMatch = trimmed.toLowerCase().match(/^eleitor\s+(\d+)$/);
+    if (eleitorMatch) {
+      const number = Number(eleitorMatch[1]);
+      if (Number.isInteger(number) && number > 0) {
+        const candidateIndex = defaults.voterOffset + number - 1;
+        const candidate = signerInfos.find((info) => info.index === candidateIndex);
+        if (candidate) return candidate.address;
+      }
+    }
+    return null;
+  };
+
+  const tokenAssignments = new Map();
+  if (isTokenizedVoting && stakeToken) {
+    const defaultMints = Math.max(1, Number(tokenConfig.mintsPerVoter ?? 1));
+    const voteCounts = new Map();
+    for (const entry of plan) {
+      const count = voteCounts.get(entry.accountIndex) ?? 0;
+      voteCounts.set(entry.accountIndex, count + 1);
+    }
+
+    for (const [accountIndex, voteCount] of voteCounts.entries()) {
+      const recipient = signerInfos[accountIndex];
+      const bucket = [];
+      const tokensToMint = Math.max(defaultMints, voteCount);
+      for (let i = 0; i < tokensToMint; i += 1) {
+        const nextTokenId = await stakeToken.nextTokenId();
+        await (await stakeToken.connect(issuer).mint(recipient.address)).wait();
+        bucket.push(nextTokenId);
+      }
+      tokenAssignments.set(accountIndex, bucket);
+    }
+
+    const additionalMints = Array.isArray(tokenConfig.mintTo)
+      ? tokenConfig.mintTo
+      : tokenConfig.mintTo
+      ? [tokenConfig.mintTo]
+      : [];
+    for (const target of additionalMints) {
+      const resolved = resolveAccountAddress(target);
+      if (!resolved) continue;
+      const match = signerInfos.find((info) => info.address.toLowerCase() === resolved.toLowerCase());
+      if (!match) continue;
+      const bucket = tokenAssignments.get(match.index) ?? [];
+      const nextTokenId = await stakeToken.nextTokenId();
+      await (await stakeToken.connect(issuer).mint(resolved)).wait();
+      bucket.push(nextTokenId);
+      tokenAssignments.set(match.index, bucket);
+    }
+
+    if (Array.isArray(tokenConfig.transfers)) {
+      for (const transfer of tokenConfig.transfers) {
+        const fromAddress = resolveAccountAddress(transfer?.from);
+        const toAddress = resolveAccountAddress(transfer?.to);
+        if (!fromAddress || !toAddress) continue;
+        const amount = Number(transfer?.amount ?? 0);
+        if (!Number.isFinite(amount) || amount <= 0) continue;
+
+        const fromInfo = signerInfos.find((info) => info.address.toLowerCase() === fromAddress.toLowerCase());
+        const toInfo = signerInfos.find((info) => info.address.toLowerCase() === toAddress.toLowerCase());
+        if (!fromInfo || !toInfo) continue;
+
+        const fromBucket = tokenAssignments.get(fromInfo.index) ?? [];
+        const toBucket = tokenAssignments.get(toInfo.index) ?? [];
+
+        for (let i = 0; i < amount; i += 1) {
+          const tokenId = fromBucket.shift();
+          if (tokenId === undefined) break;
+          await (await stakeToken.connect(fromInfo.signer).transferFrom(fromInfo.address, toInfo.address, tokenId)).wait();
+          toBucket.unshift(tokenId);
+        }
+
+        tokenAssignments.set(fromInfo.index, fromBucket);
+        tokenAssignments.set(toInfo.index, toBucket);
+      }
+    }
+  }
+
   await moveToTimestamp(provider, startAt + 1, { phase: "commit", label });
 
   for (const entry of plan) {
@@ -81,18 +189,41 @@ export async function runSimulation(simulation, env) {
     const salt = ethers.hexlify(ethers.randomBytes(32));
     const credentialSecret = ethers.hexlify(ethers.randomBytes(32));
     const credentialHash = ethers.keccak256(credentialSecret);
-    const commitment = ethers.solidityPackedKeccak256(["bytes32", "uint8", "bytes32"], [credentialHash, entry.optionIndex, salt]);
+    const commitment = isTokenizedVoting
+      ? ethers.solidityPackedKeccak256(
+          ["bytes32", "uint8", "bytes32", "address"],
+          [credentialHash, entry.optionIndex, salt, voterAddress]
+        )
+      : ethers.solidityPackedKeccak256(["bytes32", "uint8", "bytes32"], [credentialHash, entry.optionIndex, salt]);
     const msgHash = ethers.solidityPackedKeccak256(["string", "bytes32"], ["SimpleVoting:", credentialHash]);
     const signature = await issuer.signMessage(ethers.getBytes(msgHash));
 
-    const commitTx = await contract.connect(voter).commitVote(credentialHash, commitment, signature);
+    let commitTx;
+    if (isTokenizedVoting) {
+      const bucket = tokenAssignments.get(entry.accountIndex) ?? [];
+      if (bucket.length === 0) {
+        const nextTokenId = await stakeToken.nextTokenId();
+        await (await stakeToken.connect(issuer).mint(voterAddress)).wait();
+        bucket.push(nextTokenId);
+        tokenAssignments.set(entry.accountIndex, bucket);
+      }
+      const tokenId = bucket.shift();
+      entry.tokenId = tokenId;
+      commitTx = await contract.connect(voter).commitVoteWithToken(tokenId, credentialHash, commitment, signature);
+    } else {
+      commitTx = await contract.connect(voter).commitVote(credentialHash, commitment, signature);
+    }
     await commitTx.wait();
 
     entry.salt = salt;
     entry.commitment = commitment;
     entry.credentialHash = credentialHash;
 
-    console.log(`Commit credential ${credentialHash} (conta ${voterAddress})`);
+    if (isTokenizedVoting) {
+      console.log(`Commit credential ${credentialHash} (conta ${voterAddress}, token ${entry.tokenId?.toString() ?? "?"})`);
+    } else {
+      console.log(`Commit credential ${credentialHash} (conta ${voterAddress})`);
+    }
   }
 
   await moveToTimestamp(provider, commitEndAt + 1, { phase: "reveal", label });
@@ -104,10 +235,14 @@ export async function runSimulation(simulation, env) {
     await revealTx.wait();
 
     // Registro minimizado para privacidade: apenas associacao entre tokens
-    voteRecords.push({
+    const record = {
       voterToken: entry.credentialHash,
       voteToken: entry.commitment,
-    });
+    };
+    if (isTokenizedVoting && entry.tokenId !== undefined) {
+      record.stakeTokenId = entry.tokenId.toString();
+    }
+    voteRecords.push(record);
 
     console.log(`Reveal credential ${entry.credentialHash} (conta ${revealAddress})`);
   }
@@ -170,6 +305,7 @@ export async function runSimulation(simulation, env) {
           votes: Number(leadingVotes),
           tie: hasTie,
         },
+        stakeTokenAddress,
         commitEndISO,
         endISO,
         startISO,
