@@ -158,9 +158,9 @@ O script realiza o deploy de `StakeToken` + `TokenizedVoting` na rede `localhost
 ### SimpleVoting.sol
 
 - `commitVote(bytes32 credentialHash, bytes32 commitment, bytes signature)`  
-  Valida a assinatura da autoridade, verifica janelas e registra o compromisso já atrelado ao endereço do remetente.
+  Valida a assinatura da autoridade, verifica janelas e registra o compromisso. Na implementacao base o peso de cada voto e 1.
 - `revealVote(bytes32 credentialHash, uint8 optionIndex, bytes32 salt)`  
-  Recalcula o hash com `(credentialHash, optionIndex, salt, committer)` e incrementa o contador da opção escolhida.
+  Recalcula o hash, confere e incrementa o contador da opcao escolhida.
 - `revokeCredential` / `restoreCredential`  
   Permite invalidar credenciais nao utilizadas caso o emissor detecte abuso.
 - `metadata()`, `optionDetails()`, `ballotOf()`  
@@ -180,7 +180,7 @@ O script realiza o deploy de `StakeToken` + `TokenizedVoting` na rede `localhost
 - `stakeTokenAddress()`  
   Retorna o endereco do contrato `StakeToken` utilizado como requisito de participacao.
 - `commitVoteWithToken(uint256 tokenId, bytes32 credentialHash, bytes32 commitment, bytes signature)`  
-  Apenas o dono do token pode realizar commit; operadores/aprovações não são aceitos. O método integra a autorização por token ao fluxo de credencial cega do `SimpleVoting`.
+  Combina a verificacao do token ERC-721 externo (dono ou operador aprovado) com a logica de credencial cega do `SimpleVoting`.
 - `tokenUsed(uint256 tokenId)`  
   Indica se o token de stake ja teve commit registrado (evita reuso na mesma pauta).
 
