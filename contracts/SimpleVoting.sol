@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 /// @title Commit-Reveal voting contract for permissioned PoS networks
 /// @notice One proposal per contract. Each credential commits a vote hash and reveals later within the configured window.
@@ -33,6 +34,8 @@ contract SimpleVoting {
     error CredentialRevoked();
     error CredentialAlreadyRevoked();
     error CredentialNotRevoked();
+    error InvalidAuditRoot();
+    error AuditSnapshotAlreadySet();
 
     // ======== Events ========
     event Committed(bytes32 indexed commitment, uint256 timestamp);
@@ -42,11 +45,12 @@ contract SimpleVoting {
     event CredentialRestoredEvent(bytes32 indexed credentialHash, uint256 timestamp);
     event OptionAdded(uint256 indexed optionIndex, string label);
     event NameUpdated(string name);
+    event AuditSnapshotSet(bytes32 indexed root, uint256 timestamp);
 
     // ======== State ========
     address public immutable owner;        // contract administrator
     address public immutable issuer;       // authority that signs credentials
-    string public name;                    // proposal label
+    string public proposalName;            // proposal label
     string[] private _options;             // voting options
     uint256 public immutable startAt;      // commit window start (unix)
     uint256 public immutable commitEndAt;  // commit window end (unix)
@@ -58,6 +62,8 @@ contract SimpleVoting {
     struct Ballot {
         bytes32 commitment;
         bool revealed;
+        uint96 weight;
+        address committer;
     }
 
     struct ElectionMetadata {
@@ -73,8 +79,9 @@ contract SimpleVoting {
         uint256 totalVotes;
     }
 
-    mapping(bytes32 => Ballot) private _ballots; // credential hash => ballot
+    mapping(bytes32 => Ballot) internal _ballots; // credential hash => ballot
     mapping(bytes32 => bool) private _revoked;    // credential hash => revoked flag
+    bytes32 public auditSnapshotRoot;             // merkle root of commitments at commit close
 
     bool public finalized;
     uint256 public constant VERSION = 1;
@@ -94,7 +101,7 @@ contract SimpleVoting {
 
         owner = msg.sender;
         issuer = _issuer;
-        name = _name;
+        proposalName = _name;
         startAt = _startAt;
         commitEndAt = _commitEndAt;
         endAt = _endAt;
@@ -109,9 +116,9 @@ contract SimpleVoting {
 
     /// @notice Register a vote commitment during the commit window.
     /// @param credentialHash Blind credential hash representing the voter.
-    /// @param commitment Hash computed via keccak256(credentialHash, optionIndex, salt).
+    /// @param commitment Hash computed via keccak256(credentialHash, optionIndex, salt, committer).
     /// @param signature Signature issued by the credential authority over credentialHash.
-    function commitVote(bytes32 credentialHash, bytes32 commitment, bytes calldata signature) external {
+    function commitVote(bytes32 credentialHash, bytes32 commitment, bytes calldata signature) public virtual {
         uint256 t = _enforceCommitPhase();
         if (credentialHash == bytes32(0)) revert InvalidCredentialHash();
         if (commitment == bytes32(0)) revert ZeroCommitment();
@@ -125,6 +132,8 @@ contract SimpleVoting {
         if (recovered != issuer) revert InvalidCredentialSignature();
 
         ballot.commitment = commitment;
+        ballot.weight = 1;
+        ballot.committer = msg.sender;
         emit Committed(commitment, t);
     }
 
@@ -132,7 +141,7 @@ contract SimpleVoting {
     /// @param credentialHash Blind credential associated with the commitment.
     /// @param optionIndex Index of the chosen option.
     /// @param salt Random salt used at commit time.
-    function revealVote(bytes32 credentialHash, uint8 optionIndex, bytes32 salt) external {
+    function revealVote(bytes32 credentialHash, uint8 optionIndex, bytes32 salt) public virtual {
         uint256 t = _enforceRevealPhase();
         if (optionIndex >= _options.length) revert InvalidOption();
         if (salt == bytes32(0)) revert InvalidSalt();
@@ -142,11 +151,12 @@ contract SimpleVoting {
         if (commitment == bytes32(0)) revert NoCommitment();
         if (ballot.revealed) revert AlreadyRevealed();
 
-        bytes32 computed = keccak256(abi.encodePacked(credentialHash, optionIndex, salt));
+        bytes32 computed = keccak256(abi.encodePacked(credentialHash, optionIndex, salt, ballot.committer));
         if (computed != commitment) revert InvalidReveal();
 
         ballot.revealed = true;
-        _tally[optionIndex] += 1;
+        uint96 weight = ballot.weight;
+        _tally[optionIndex] += weight == 0 ? 1 : weight;
         emit Voted(optionIndex, t);
     }
 
@@ -157,6 +167,25 @@ contract SimpleVoting {
 
         finalized = true;
         emit Finalized(_tally, block.timestamp);
+    }
+
+    /// @notice Set a Merkle root snapshot of commitments after commit phase closes for audit purposes.
+    /// @dev The root should be computed off-chain using pairwise-sorted hashing of commitment leaves (bytes32 commitments).
+    ///      This does not reduce privacy: it's a single hash derived from already-public commit events.
+    function setAuditSnapshotRoot(bytes32 root) external onlyOwner {
+        if (root == bytes32(0)) revert InvalidAuditRoot();
+        if (auditSnapshotRoot != bytes32(0)) revert AuditSnapshotAlreadySet();
+        // ensure commit phase is closed
+        if (block.timestamp <= commitEndAt) revert RevealPhaseNotOpen();
+        auditSnapshotRoot = root;
+        emit AuditSnapshotSet(root, block.timestamp);
+    }
+
+    /// @notice Verify whether a commitment belongs to the stored audit snapshot using a Merkle proof.
+    function verifyAuditCommitment(bytes32 commitment, bytes32[] calldata proof) external view returns (bool) {
+        bytes32 root = auditSnapshotRoot;
+        if (root == bytes32(0)) return false;
+        return MerkleProof.verifyCalldata(proof, root, commitment);
     }
 
     /// @notice Revoke a credential that has not committed yet.
@@ -243,7 +272,7 @@ contract SimpleVoting {
 
     function metadata() external view returns (ElectionMetadata memory summary) {
         summary = ElectionMetadata({
-            name: name,
+            name: proposalName,
             owner: owner,
             issuer: issuer,
             startAt: startAt,
@@ -268,6 +297,11 @@ contract SimpleVoting {
         revoked = _revoked[credentialHash];
     }
 
+    function ballotWeight(bytes32 credentialHash) external view returns (uint256) {
+        uint96 weight = _ballots[credentialHash].weight;
+        return weight == 0 ? 1 : weight;
+    }
+
     function isCredentialRevoked(bytes32 credentialHash) external view returns (bool) {
         return _revoked[credentialHash];
     }
@@ -284,9 +318,13 @@ contract SimpleVoting {
         return _credentialSignDigest(credentialHash);
     }
 
-    function computeCommitment(bytes32 credentialHash, uint8 optionIndex, bytes32 salt) external pure returns (bytes32) {
+    function computeCommitment(bytes32 credentialHash, uint8 optionIndex, bytes32 salt, address committer)
+        external
+        pure
+        returns (bytes32)
+    {
         if (salt == bytes32(0)) revert InvalidSalt();
-        return keccak256(abi.encodePacked(credentialHash, optionIndex, salt));
+        return keccak256(abi.encodePacked(credentialHash, optionIndex, salt, committer));
     }
 
     function ballotOf(bytes32 credentialHash) external view returns (bytes32 commitment, bool revealed) {
@@ -321,7 +359,7 @@ contract SimpleVoting {
     function setName(string calldata newName) external onlyOwner {
         _enforceBeforeStart();
         if (bytes(newName).length == 0) revert EmptyName();
-        name = newName;
+        proposalName = newName;
         emit NameUpdated(newName);
     }
 

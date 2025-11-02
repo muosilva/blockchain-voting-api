@@ -11,28 +11,25 @@
   },
   "simulations": [
     {
-      "id": "exemplo-basico",
-      "name": "TITULO GENERICO DA PAUTA",
-      "description": "Descricao curta e generica da pauta/assunto",
-      "options": [
-        "Opcao A",
-        "Opcao B"
-      ],
-      "votes": [
-        { "label": "Eleitor 1", "optionIndex": 0 },
-        { "label": "Eleitor 2", "optionIndex": 1 },
-        { "label": "Eleitor 3", "optionIndex": 0 }
-      ],
+      "id": "exemplo-tokenizado-transferencia",
+      "name": "Pauta tokenizada com transferencia",
+      "description": "Demonstra TokenizedVoting: transfere token de A para B e B vota 2x",
+      "options": ["Aprovar", "Rejeitar"],
+      "contractName": "TokenizedVoting",
       "issuerIndex": 0,
-      "output": {
-        "file": "cache/simulate-result-exemplo.json"
+      "votes": [
+        { "label": "B voto 1", "accountIndex": 2, "optionIndex": 0 },
+        { "label": "B voto 2", "accountIndex": 2, "optionIndex": 1 }
+      ],
+      "token": {
+        "name": "PoS Stake Token",
+        "symbol": "PST",
+        "baseURI": "https://example.com/metadata/stake/",
+        "mintTo": [1, 2],
+        "transfers": [ { "fromIndex": 1, "toIndex": 2 } ]
       },
-      "timing": {
-        "startDelay": 5,
-        "commitDuration": 60,
-        "revealDuration": 60
-      }
+      "output": { "directory": "cache", "file": "simulate-result-exemplo-tokenizado.json" },
+      "timing": { "startDelay": 5, "commitDuration": 45, "revealDuration": 45 }
     }
   ]
 }
-
