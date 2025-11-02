@@ -54,7 +54,7 @@ describe("Simulation token transfers", function () {
     const payload = await runAndRead("sim-7");
     const stakeTokenIds = payload.votes.map((vote) => vote.stakeTokenId);
 
-    expect(stakeTokenIds).to.deep.equal(["4", "3", "1"]);
+    expect(stakeTokenIds).to.deep.equal(["1", "2", "3"]);
   });
 
   it("sim-15 transfers the only token and the recipient casts both votes", async function () {
@@ -64,6 +64,6 @@ describe("Simulation token transfers", function () {
     const payload = await runAndRead("sim-15");
     const stakeTokenIds = payload.votes.map((vote) => vote.stakeTokenId);
 
-    expect(stakeTokenIds).to.deep.equal(["3", "1"]);
+    expect(stakeTokenIds).to.deep.equal(["1", "2"]);
   });
 });

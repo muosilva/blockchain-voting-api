@@ -47,23 +47,53 @@ export async function runSimulation(simulation, env) {
   const label = simulation.label ?? simulation.id ?? simulation.name ?? `sim-${Date.now()}`;
   console.log(`\n=== Simulacao: ${label} ===`);
 
+  const contractName = simulation.contractName ?? "SimpleVoting";
+  const isTokenizedVoting = contractName === "TokenizedVoting";
+
+  const tokenConfig = simulation.token ?? null;
+
   const timing = mergeTiming(defaults.timing, simulation.timing);
-  const now = Math.floor(Date.now() / 1000);
+  const latestBlock = await provider.getBlock("latest");
+  const now = Number(latestBlock?.timestamp ?? Math.floor(Date.now() / 1000));
+  const mintOverhead = isTokenizedVoting && !tokenConfig?.address ? plan.length : 0;
+  const commitWindow = Math.max(timing.commitDuration ?? 0, plan.length + mintOverhead + 2);
+  const revealWindow = Math.max(timing.revealDuration ?? 0, plan.length + 2);
   const startAt = now + timing.startDelay;
-  const commitEndAt = startAt + timing.commitDuration;
-  const endAt = commitEndAt + timing.revealDuration;
+  const commitEndAt = startAt + commitWindow;
+  const endAt = commitEndAt + revealWindow;
 
   const startISO = new Date(startAt * 1000).toISOString();
   const commitEndISO = new Date(commitEndAt * 1000).toISOString();
   const endISO = new Date(endAt * 1000).toISOString();
-
-  const contractName = simulation.contractName ?? "SimpleVoting";
-
-  const tokenConfig = simulation.token ?? null;
   let stakeToken = null;
   let stakeTokenAddress = null;
   const tokenMints = [];
   const tokenTransfers = [];
+
+  function resolveAccountAddress(value) {
+    if (typeof value !== "string") return null;
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === "0x...") return null;
+    if (trimmed.startsWith("0x") && trimmed.length >= 10) {
+      const match = signerInfos.find((info) => info.address.toLowerCase() === trimmed.toLowerCase());
+      return match ? match.address : trimmed;
+    }
+    const planMatch = plan.find(
+      (entry) => typeof entry.label === "string" && entry.label.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (planMatch) return planMatch.accountAddress;
+
+    const eleitorMatch = trimmed.toLowerCase().match(/^eleitor\s+(\d+)$/);
+    if (eleitorMatch) {
+      const number = Number(eleitorMatch[1]);
+      if (Number.isInteger(number) && number > 0) {
+        const candidateIndex = defaults.voterOffset + number - 1;
+        const candidate = signerInfos.find((info) => info.index === candidateIndex);
+        if (candidate) return candidate.address;
+      }
+    }
+    return null;
+  }
 
   const resolveSignerByRef = (ref) => {
     if (ref === undefined || ref === null) return null;
@@ -73,14 +103,18 @@ export async function runSimulation(simulation, env) {
       return info;
     }
     if (typeof ref === "string") {
-      const match = signerInfos.find((i) => i.address.toLowerCase() === ref.toLowerCase());
-      if (!match) throw new Error(`Endereco ${ref} nao encontrado para referencia de transferencia.`);
+      const resolvedAddress = resolveAccountAddress(ref);
+      if (!resolvedAddress) {
+        throw new Error(`Endereco ${ref} nao encontrado para referencia de transferencia.`);
+      }
+      const match = signerInfos.find((i) => i.address.toLowerCase() === resolvedAddress.toLowerCase());
+      if (!match) throw new Error(`Endereco ${resolvedAddress} nao encontrado para referencia de transferencia.`);
       return match;
     }
     return null;
   };
 
-  const wantsTokenSupport = !!tokenConfig || contractName === "TokenizedVoting";
+  const wantsTokenSupport = !!tokenConfig || isTokenizedVoting;
 
   if (wantsTokenSupport) {
     if (tokenConfig?.address) {
@@ -97,9 +131,7 @@ export async function runSimulation(simulation, env) {
       console.log("StakeToken deploy:", stakeTokenAddress);
     }
 
-    const uniquePlanAccounts = Array.from(new Set(plan.map((p) => p.accountAddress)));
     const mintsConfig = Array.isArray(tokenConfig?.mintTo) ? tokenConfig.mintTo : [];
-    const mintsPerVoter = Number.isFinite(tokenConfig?.mintsPerVoter) ? tokenConfig.mintsPerVoter : 1;
 
     if (mintsConfig.length > 0) {
       for (const entry of mintsConfig) {
@@ -114,17 +146,6 @@ export async function runSimulation(simulation, env) {
         const mintedId = Number(nextId) - 1;
         tokenMints.push({ to: toInfo.address, tokenId: mintedId, txHash: receipt?.hash });
         console.log(`Minted tokenId ${mintedId} to ${toInfo.address}`);
-      }
-    } else if (contractName === "TokenizedVoting" || tokenConfig?.useForVoting) {
-      for (const addr of uniquePlanAccounts) {
-        for (let i = 0; i < mintsPerVoter; i += 1) {
-          const mintTx = await stakeToken.connect(issuer).mint(addr);
-          const receipt = await mintTx.wait();
-          const nextId = await stakeToken.nextTokenId();
-          const mintedId = Number(nextId) - 1;
-          tokenMints.push({ to: addr, tokenId: mintedId, txHash: receipt?.hash });
-          if (i === 0) console.log(`Minted tokenId ${mintedId} to ${addr}`);
-        }
       }
     }
 
@@ -184,95 +205,6 @@ export async function runSimulation(simulation, env) {
 
   const voteRecords = [];
 
-  const resolveAccountAddress = (value) => {
-    if (typeof value !== "string") return null;
-    const trimmed = value.trim();
-    if (!trimmed || trimmed === "0x...") return null;
-    if (trimmed.startsWith("0x") && trimmed.length >= 10) {
-      const match = signerInfos.find((info) => info.address.toLowerCase() === trimmed.toLowerCase());
-      return match ? match.address : trimmed;
-    }
-    const planMatch = plan.find((entry) => typeof entry.label === "string" && entry.label.toLowerCase() === trimmed.toLowerCase());
-    if (planMatch) return planMatch.accountAddress;
-
-    const eleitorMatch = trimmed.toLowerCase().match(/^eleitor\s+(\d+)$/);
-    if (eleitorMatch) {
-      const number = Number(eleitorMatch[1]);
-      if (Number.isInteger(number) && number > 0) {
-        const candidateIndex = defaults.voterOffset + number - 1;
-        const candidate = signerInfos.find((info) => info.index === candidateIndex);
-        if (candidate) return candidate.address;
-      }
-    }
-    return null;
-  };
-
-  const tokenAssignments = new Map();
-  if (isTokenizedVoting && stakeToken) {
-    const defaultMints = Math.max(1, Number(tokenConfig.mintsPerVoter ?? 1));
-    const voteCounts = new Map();
-    for (const entry of plan) {
-      const count = voteCounts.get(entry.accountIndex) ?? 0;
-      voteCounts.set(entry.accountIndex, count + 1);
-    }
-
-    for (const [accountIndex, voteCount] of voteCounts.entries()) {
-      const recipient = signerInfos[accountIndex];
-      const bucket = [];
-      const tokensToMint = Math.max(defaultMints, voteCount);
-      for (let i = 0; i < tokensToMint; i += 1) {
-        const nextTokenId = await stakeToken.nextTokenId();
-        await (await stakeToken.connect(issuer).mint(recipient.address)).wait();
-        bucket.push(nextTokenId);
-      }
-      tokenAssignments.set(accountIndex, bucket);
-    }
-
-    const additionalMints = Array.isArray(tokenConfig.mintTo)
-      ? tokenConfig.mintTo
-      : tokenConfig.mintTo
-      ? [tokenConfig.mintTo]
-      : [];
-    for (const target of additionalMints) {
-      const resolved = resolveAccountAddress(target);
-      if (!resolved) continue;
-      const match = signerInfos.find((info) => info.address.toLowerCase() === resolved.toLowerCase());
-      if (!match) continue;
-      const bucket = tokenAssignments.get(match.index) ?? [];
-      const nextTokenId = await stakeToken.nextTokenId();
-      await (await stakeToken.connect(issuer).mint(resolved)).wait();
-      bucket.push(nextTokenId);
-      tokenAssignments.set(match.index, bucket);
-    }
-
-    if (Array.isArray(tokenConfig.transfers)) {
-      for (const transfer of tokenConfig.transfers) {
-        const fromAddress = resolveAccountAddress(transfer?.from);
-        const toAddress = resolveAccountAddress(transfer?.to);
-        if (!fromAddress || !toAddress) continue;
-        const amount = Number(transfer?.amount ?? 0);
-        if (!Number.isFinite(amount) || amount <= 0) continue;
-
-        const fromInfo = signerInfos.find((info) => info.address.toLowerCase() === fromAddress.toLowerCase());
-        const toInfo = signerInfos.find((info) => info.address.toLowerCase() === toAddress.toLowerCase());
-        if (!fromInfo || !toInfo) continue;
-
-        const fromBucket = tokenAssignments.get(fromInfo.index) ?? [];
-        const toBucket = tokenAssignments.get(toInfo.index) ?? [];
-
-        for (let i = 0; i < amount; i += 1) {
-          const tokenId = fromBucket.shift();
-          if (tokenId === undefined) break;
-          await (await stakeToken.connect(fromInfo.signer).transferFrom(fromInfo.address, toInfo.address, tokenId)).wait();
-          toBucket.unshift(tokenId);
-        }
-
-        tokenAssignments.set(fromInfo.index, fromBucket);
-        tokenAssignments.set(toInfo.index, toBucket);
-      }
-    }
-  }
-
   await moveToTimestamp(provider, startAt + 1, { phase: "commit", label });
 
   for (const entry of plan) {
@@ -289,15 +221,26 @@ export async function runSimulation(simulation, env) {
     const signature = await issuer.signMessage(ethers.getBytes(msgHash));
 
     if (contractName === "TokenizedVoting") {
+      let owned = [];
       const ownedRaw = await stakeToken.tokensOfOwner(voterAddress);
-      const owned = (ownedRaw || []).map((v) => Number(v));
-      if (!owned || owned.length === 0) {
-        throw new Error(`Conta ${voterAddress} nao possui token de stake para commit.`);
+      if (Array.isArray(ownedRaw)) {
+        owned = ownedRaw.map((value) => Number(value));
       }
       const usedSet = usedTokenIdsByAddress.get(voterAddress) ?? new Set();
+
+      while (!tokenConfig?.address && owned.length <= usedSet.size) {
+        const mintTx = await stakeToken.connect(issuer).mint(voterAddress);
+        const receipt = await mintTx.wait();
+        const nextId = await stakeToken.nextTokenId();
+        const mintedId = Number(nextId) - 1;
+        owned.push(mintedId);
+        tokenMints.push({ to: voterAddress, tokenId: mintedId, txHash: receipt?.hash });
+        console.log(`Minted tokenId ${mintedId} to ${voterAddress} (on-demand)`);
+      }
+
       const tokenId = owned.find((id) => !usedSet.has(id));
       if (!Number.isFinite(tokenId)) {
-        throw new Error(`Conta ${voterAddress} nao possui token de stake livre para um segundo commit.`);
+        throw new Error(`Conta ${voterAddress} nao possui token de stake livre para commit.`);
       }
       const commitTx = await contract
         .connect(voter)
@@ -366,7 +309,7 @@ export async function runSimulation(simulation, env) {
       voterToken: entry.credentialHash,
       voteToken: entry.commitment,
     };
-    if (Number.isFinite(entry.tokenId)) record.tokenId = entry.tokenId;
+    if (Number.isFinite(entry.tokenId)) record.stakeTokenId = String(entry.tokenId);
     voteRecords.push(record);
 
     console.log(`Reveal credential ${entry.credentialHash} (conta ${revealAddress})`);
