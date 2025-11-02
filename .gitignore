@@ -11,6 +11,10 @@ typechain/
 types/
 coverage/
 
+# TypeChain generated bindings (Hardhat)
+types/ethers-contracts/
+types/typechain/
+
 # Ambiente
 .env
 .env.local
