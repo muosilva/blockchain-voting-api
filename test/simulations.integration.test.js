@@ -3,7 +3,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { getEthers } from "./utils/hardhat.js";
 import { runSimulation } from "../scripts/lib/runner.js";
-import { DEFAULTS as SIM_DEFAULTS } from "../scripts/lib/sim-config.js";
+import { DEFAULTS as SIM_DEFAULTS, loadSimulations } from "../scripts/lib/sim-config.js";
+import { prepareProviderReset } from "../scripts/lib/provider-utils.js";
 
 function sum(arr) {
   return arr.reduce((a, b) => a + BigInt(b), 0n);
@@ -67,5 +68,41 @@ describe("Scenario Simulations (E2E)", function () {
     expect(sum(payload.optionCounts)).to.equal(3n);
 
     expect(payload.votes).to.have.length(3);
+  });
+
+  it("runs every generated simulation config and validates outcomes", async function () {
+    this.timeout(180000);
+
+    const ethers = await getEthers();
+    const provider = ethers.provider;
+    const configPath = path.resolve("scripts/simulations.generated.json");
+    const config = await loadSimulations(configPath);
+
+    for (const scenario of config.simulations) {
+      const scenarioCopy = JSON.parse(JSON.stringify(scenario));
+      const { restore } = await prepareProviderReset(provider);
+
+      try {
+        const result = await runSimulation(scenarioCopy, { ethers, provider, defaults: config.defaults });
+        const payload = JSON.parse(await readFile(result.outputPath, "utf-8"));
+
+        expect(payload.simulation?.config?.options).to.deep.equal(scenario.options);
+        expect(payload.optionLabels).to.deep.equal(scenario.options);
+        const expectedVotes = Array.isArray(scenario.votes) ? scenario.votes.length : 0;
+        const talliedVotes = payload.optionCounts.reduce((sum, value) => sum + Number(value), 0);
+
+        expect(payload.metadata.optionCount).to.equal(scenario.options.length);
+        expect(payload.metadata.totalVotes).to.equal(expectedVotes);
+        expect(talliedVotes).to.equal(expectedVotes);
+
+        if ((scenario.contractName ?? "SimpleVoting") === "TokenizedVoting") {
+          expect(payload.token?.stakeTokenAddress).to.be.a("string");
+        }
+      } finally {
+        if (typeof restore === "function") {
+          await restore();
+        }
+      }
+    }
   });
 });

@@ -85,6 +85,27 @@ async function detectTimeControl(provider) {
   return timeControlState.supported;
 }
 
+async function advanceTimeFallback(provider, targetTimestamp) {
+  const currentTimestamp = await getLatestTimestamp(provider);
+  let delta = targetTimestamp - currentTimestamp;
+  if (delta <= 0) return true;
+  try {
+    await provider.send("evm_increaseTime", [delta]);
+    await provider.send("evm_mine", []);
+    return true;
+  } catch (error) {
+    if (!isMethodNotSupported(error)) throw error;
+  }
+  try {
+    const hexTimestamp = "0x" + targetTimestamp.toString(16);
+    await provider.send("evm_mine", [hexTimestamp]);
+    return true;
+  } catch (error) {
+    if (!isMethodNotSupported(error)) throw error;
+  }
+  return false;
+}
+
 function describeContext(context = {}) {
   const parts = [];
   if (context.phase) parts.push(context.phase);
@@ -118,6 +139,8 @@ export async function moveToTimestamp(provider, targetTimestamp, context) {
     await provider.send("evm_mine", []);
     return;
   }
+  if (await advanceTimeFallback(provider, targetTimestamp)) {
+    return;
+  }
   await waitForTimestamp(provider, targetTimestamp, context);
 }
-
