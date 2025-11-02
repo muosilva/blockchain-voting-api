@@ -37,11 +37,36 @@ export function validateStructure(data, expectedCount) {
     if (typeof simulation.name !== "string" || !simulation.name.trim()) {
       throw new Error(`Simulacao ${simulation.id} precisa de name.`);
     }
-    if (!Array.isArray(simulation.options) || simulation.options.length === 0) {
-      throw new Error(`Simulacao ${simulation.id} precisa de opcoes.`);
+    if (!Array.isArray(simulation.options) || simulation.options.length < 2 || simulation.options.length > 8) {
+      throw new Error(`Simulacao ${simulation.id} precisa de entre 2 e 8 opcoes.`);
     }
-    if (!Array.isArray(simulation.votes) || simulation.votes.length === 0) {
-      throw new Error(`Simulacao ${simulation.id} precisa de votos.`);
+    if (!Array.isArray(simulation.votes) || simulation.votes.length < 2 || simulation.votes.length > 10) {
+      throw new Error(`Simulacao ${simulation.id} precisa de entre 2 e 10 votos.`);
+    }
+
+    if (simulation.contractName === "TokenizedVoting") {
+      const token = simulation.token;
+      if (!token || typeof token !== "object") {
+        throw new Error(`Simulacao ${simulation.id} com TokenizedVoting precisa do objeto "token".`);
+      }
+      const ensureNoPlaceholder = (value, path) => {
+        if (typeof value === "string" && value.includes("...")) {
+          throw new Error(`Simulacao ${simulation.id} usa placeholder invalido em ${path}.`);
+        }
+      };
+      if (Array.isArray(token.mintTo)) {
+        token.mintTo.forEach((entry, idx) => ensureNoPlaceholder(entry, `token.mintTo[${idx}]`));
+      } else {
+        ensureNoPlaceholder(token.mintTo, "token.mintTo");
+      }
+      if (Array.isArray(token.transfers)) {
+        token.transfers.forEach((transfer, transferIndex) => {
+          if (transfer) {
+            ensureNoPlaceholder(transfer.from, `token.transfers[${transferIndex}].from`);
+            ensureNoPlaceholder(transfer.to, `token.transfers[${transferIndex}].to`);
+          }
+        });
+      }
     }
   });
   if (Number.isFinite(expectedCount) && expectedCount > 0 && simulations.length !== expectedCount) {

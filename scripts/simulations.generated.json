@@ -11,26 +11,203 @@
   },
   "simulations": [
     {
-      "id": "transfer-usando-token",
-      "name": "Pauta tokenizada com transferencia (TokenizedVoting)",
-      "description": "Usa TokenizedVoting, exigindo possuir o NFT no commit; inclui transferencia antes do commit. B fica com 2 tokens e vota duas vezes.",
-      "options": ["Aprovar", "Rejeitar"],
-      "contractName": "TokenizedVoting",
-      "issuerIndex": 0,
+      "id": "sim-1",
+      "name": "Votacao Simples - Reforma do Salao de Festas",
+      "options": ["Sim", "Nao"],
       "votes": [
-        { "label": "B voto 1", "accountIndex": 3, "optionIndex": 1 },
-        { "label": "B voto 2", "accountIndex": 3, "optionIndex": 1 }
+        { "label": "Eleitor 1", "optionIndex": 0 },
+        { "label": "Eleitor 2", "optionIndex": 1 },
+        { "label": "Eleitor 3", "optionIndex": 0 },
+        { "label": "Eleitor 4", "optionIndex": 0 }
+      ]
+    },
+    {
+      "id": "sim-2",
+      "name": "Empate na Votacao - Orcamento Anual",
+      "options": ["Aprovar", "Rejeitar"],
+      "votes": [
+        { "label": "Eleitor 1", "optionIndex": 0 },
+        { "label": "Eleitor 2", "optionIndex": 1 },
+        { "label": "Eleitor 3", "optionIndex": 0 },
+        { "label": "Eleitor 4", "optionIndex": 1 }
+      ]
+    },
+    {
+      "id": "sim-3",
+      "name": "Multiplas Opcoes - Escolha do Fornecedor de Energia",
+      "options": ["Fornecedor A", "Fornecedor B", "Fornecedor C"],
+      "votes": [
+        { "label": "Eleitor 1", "optionIndex": 0 },
+        { "label": "Eleitor 2", "optionIndex": 1 },
+        { "label": "Eleitor 3", "optionIndex": 2 },
+        { "label": "Eleitor 4", "optionIndex": 0 }
+      ]
+    },
+    {
+      "id": "sim-4",
+      "name": "Janela de Tempo Customizada - Reforma da Piscina",
+      "options": ["Sim", "Nao"],
+      "votes": [
+        { "label": "Eleitor 1", "optionIndex": 0 },
+        { "label": "Eleitor 2", "optionIndex": 1 }
       ],
+      "timing": { "startDelay": 10, "commitDuration": 30, "revealDuration": 45 }
+    },
+    {
+      "id": "sim-5",
+      "name": "TokenizedVoting - Garagem com duas vagas",
+      "options": ["Sim", "Nao"],
+      "votes": [
+        { "label": "Morador 1 - Token A", "optionIndex": 0, "accountIndex": 1 },
+        { "label": "Morador 1 - Token B", "optionIndex": 0, "accountIndex": 1 },
+        { "label": "Morador 2", "optionIndex": 1, "accountIndex": 2 }
+      ],
+      "contractName": "TokenizedVoting",
+      "token": { "useForVoting": true, "mintsPerVoter": 2 }
+    },
+    {
+      "id": "sim-6",
+      "name": "TokenizedVoting - NFTs pre distribuidos",
+      "options": ["Aprovar", "Adiar"],
+      "votes": [
+        { "label": "Eleitor 1", "optionIndex": 0, "accountIndex": 1 },
+        { "label": "Eleitor 2", "optionIndex": 1, "accountIndex": 2 },
+        { "label": "Eleitor 3", "optionIndex": 0, "accountIndex": 3 }
+      ],
+      "contractName": "TokenizedVoting",
       "token": {
-        "name": "PoS Stake Token",
-        "symbol": "PST",
-        "baseURI": "https://example.com/metadata/stake/",
-        "mintTo": [2, 3],
-        "transfers": [ { "fromIndex": 2, "toIndex": 3 } ]
-      },
-      "output": { "file": "simulate-result-transfer-tokenized.json" },
-      "timing": { "startDelay": 5, "commitDuration": 45, "revealDuration": 45 }
+        "useForVoting": true,
+        "mintTo": ["Eleitor 1", "Eleitor 2", "Eleitor 3"],
+        "mintsPerVoter": 1
+      }
+    },
+    {
+      "id": "sim-7",
+      "name": "TokenizedVoting - Transferencia antes do commit",
+      "options": ["Sim", "Nao"],
+      "votes": [
+        { "label": "Eleitor 3 (token Eleitor 1)", "optionIndex": 0, "accountIndex": 3 },
+        { "label": "Eleitor 2", "optionIndex": 1, "accountIndex": 2 },
+        { "label": "Eleitor 3", "optionIndex": 1, "accountIndex": 3 }
+      ],
+      "contractName": "TokenizedVoting",
+      "token": {
+        "useForVoting": true,
+        "mintsPerVoter": 1,
+        "mintTo": ["Eleitor 1"],
+        "transfers": [{ "from": "Eleitor 1", "to": "Eleitor 3", "amount": 1 }]
+      }
+    },
+    {
+      "id": "sim-8",
+      "name": "IssuerIndex alterado - Reforma do Playground",
+      "options": ["Sim", "Nao"],
+      "votes": [
+        { "label": "Eleitor 1", "optionIndex": 0 },
+        { "label": "Eleitor 2", "optionIndex": 1 }
+      ],
+      "issuerIndex": 1
+    },
+    {
+      "id": "sim-9",
+      "name": "VoterOffset alterado - Reforma da Area Verde",
+      "options": ["Sim", "Nao"],
+      "votes": [
+        { "label": "Eleitor 1", "optionIndex": 0 },
+        { "label": "Eleitor 2", "optionIndex": 1 }
+      ],
+      "voterOffset": 2
+    },
+    {
+      "id": "sim-10",
+      "name": "Votacao com 5 opcoes - Tipo de Piso",
+      "options": ["Madeira", "Porcelanato", "Granito", "Cimento Queimado", "Laminado"],
+      "votes": [
+        { "label": "Eleitor 1", "optionIndex": 0 },
+        { "label": "Eleitor 2", "optionIndex": 1 },
+        { "label": "Eleitor 3", "optionIndex": 2 },
+        { "label": "Eleitor 4", "optionIndex": 3 },
+        { "label": "Eleitor 5", "optionIndex": 4 }
+      ]
+    },
+    {
+      "id": "sim-11",
+      "name": "Votacao com 8 opcoes - Cores da Fachada",
+      "options": ["Branco", "Cinza Claro", "Cinza Escuro", "Amarelo", "Verde", "Azul", "Vermelho", "Bege"],
+      "votes": [
+        { "label": "Eleitor 1", "optionIndex": 0 },
+        { "label": "Eleitor 2", "optionIndex": 1 },
+        { "label": "Eleitor 3", "optionIndex": 2 },
+        { "label": "Eleitor 4", "optionIndex": 3 },
+        { "label": "Eleitor 5", "optionIndex": 4 },
+        { "label": "Eleitor 6", "optionIndex": 5 },
+        { "label": "Eleitor 7", "optionIndex": 6 },
+        { "label": "Eleitor 8", "optionIndex": 7 }
+      ]
+    },
+    {
+      "id": "sim-12",
+      "name": "TokenizedVoting - MintTo combinado com MintsPerVoter",
+      "options": ["Sim", "Nao"],
+      "votes": [
+        { "label": "Eleitor 1", "optionIndex": 0 },
+        { "label": "Eleitor 2", "optionIndex": 1 },
+        { "label": "Eleitor 3", "optionIndex": 0 }
+      ],
+      "contractName": "TokenizedVoting",
+      "token": {
+        "useForVoting": true,
+        "mintTo": ["Eleitor 1", "Eleitor 3"],
+        "mintsPerVoter": 3
+      }
+    },
+    {
+      "id": "sim-13",
+      "name": "Eleitorado maior - Reforma do Elevador",
+      "options": ["Aprovar", "Rejeitar"],
+      "votes": [
+        { "label": "Eleitor 1", "optionIndex": 0 },
+        { "label": "Eleitor 2", "optionIndex": 1 },
+        { "label": "Eleitor 3", "optionIndex": 0 },
+        { "label": "Eleitor 4", "optionIndex": 0 },
+        { "label": "Eleitor 5", "optionIndex": 1 }
+      ]
+    },
+    {
+      "id": "sim-14",
+      "name": "Quorum alto - Reforma da Cobertura",
+      "options": ["Sim", "Nao"],
+      "votes": [
+        { "label": "Eleitor 1", "optionIndex": 0 },
+        { "label": "Eleitor 2", "optionIndex": 1 }
+      ],
+      "timing": { "startDelay": 5, "commitDuration": 60, "revealDuration": 60 }
+    },
+    {
+      "id": "sim-15",
+      "name": "TokenizedVoting - Token transferido antes do reveal",
+      "options": ["Sim", "Nao"],
+      "votes": [
+        { "label": "Eleitor 2 (token Eleitor 1)", "optionIndex": 0, "accountIndex": 2 },
+        { "label": "Eleitor 2", "optionIndex": 1, "accountIndex": 2 }
+      ],
+      "contractName": "TokenizedVoting",
+      "token": {
+        "useForVoting": true,
+        "mintTo": ["Eleitor 1"],
+        "transfers": [{ "from": "Eleitor 1", "to": "Eleitor 2", "amount": 1 }]
+      }
+    },
+    {
+      "id": "sim-16",
+      "name": "Offsets diferentes - Reforma da Portaria",
+      "options": ["Sim", "Nao"],
+      "votes": [
+        { "label": "Eleitor 1", "optionIndex": 0 },
+        { "label": "Eleitor 2", "optionIndex": 1 }
+      ],
+      "issuerIndex": 2,
+      "voterOffset": 3
     }
   ]
 }
-

@@ -4,7 +4,7 @@
   "description": "Solidity + TS voting solution using ETH as network",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "hardhat clean && hardhat compile && hardhat test",
     "clean": "hardhat clean",
     "build": "hardhat compile",
     "node": "hardhat node",
