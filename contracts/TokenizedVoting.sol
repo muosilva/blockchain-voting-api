@@ -14,7 +14,8 @@ contract TokenizedVoting is SimpleVoting {
     error UseCommitWithToken();
 
     // ======== Events ========
-    event StakeTokenUsed(uint256 indexed tokenId, bytes32 indexed credentialHash, address indexed caller);
+    // Privacy: avoid emitting credentialHash/caller alongside tokenId to reduce linkability in logs
+    event StakeTokenUsed(uint256 indexed tokenId);
 
     // ======== State ========
     IERC721 public immutable stakeToken;
@@ -58,16 +59,12 @@ contract TokenizedVoting is SimpleVoting {
     ) external {
         address owner = stakeToken.ownerOf(tokenId);
         if (owner != msg.sender) {
-            bool approvedForAll = stakeToken.isApprovedForAll(owner, msg.sender);
-            address approved = stakeToken.getApproved(tokenId);
-            if (!approvedForAll && approved != msg.sender) {
-                revert TokenNotOwned(tokenId, owner, msg.sender);
-            }
+            revert TokenNotOwned(tokenId, owner, msg.sender);
         }
         if (_tokenUsed[tokenId]) revert TokenAlreadyUsed(tokenId);
 
         super.commitVote(credentialHash, commitment, signature);
         _tokenUsed[tokenId] = true;
-        emit StakeTokenUsed(tokenId, credentialHash, msg.sender);
+        emit StakeTokenUsed(tokenId);
     }
 }

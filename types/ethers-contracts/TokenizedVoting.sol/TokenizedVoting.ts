@@ -13,19 +13,20 @@ export declare namespace SimpleVoting {
     }
 
   export interface TokenizedVotingInterface extends Interface {
-    getFunction(nameOrSignature: "VERSION" | "addOption" | "ballotOf" | "ballotStatus" | "ballotWeight" | "commitEndAt" | "commitVote" | "commitVoteWithToken" | "computeCommitment" | "credentialDigest" | "currentPhase" | "endAt" | "finalize" | "finalized" | "getOption" | "isCommitPhase" | "isCredentialRevoked" | "isOpen" | "isRevealPhase" | "issuer" | "leadingOption" | "metadata" | "optionCount" | "optionDetails" | "options" | "owner" | "proposalName" | "restoreCredential" | "revealVote" | "revokeCredential" | "setName" | "stakeToken" | "stakeTokenAddress" | "startAt" | "tally" | "tokenUsed" | "totalVotes" | "verifyCredential"): FunctionFragment;
+    getFunction(nameOrSignature: "VERSION" | "addOption" | "auditSnapshotRoot" | "ballotOf" | "ballotStatus" | "ballotWeight" | "commitEndAt" | "commitVote" | "commitVoteWithToken" | "computeCommitment" | "credentialDigest" | "currentPhase" | "endAt" | "finalize" | "finalized" | "getOption" | "isCommitPhase" | "isCredentialRevoked" | "isOpen" | "isRevealPhase" | "issuer" | "leadingOption" | "metadata" | "optionCount" | "optionDetails" | "options" | "owner" | "proposalName" | "restoreCredential" | "revealVote" | "revokeCredential" | "setAuditSnapshotRoot" | "setName" | "stakeToken" | "stakeTokenAddress" | "startAt" | "tally" | "tokenUsed" | "totalVotes" | "verifyAuditCommitment" | "verifyCredential"): FunctionFragment;
 
-    getEvent(nameOrSignatureOrTopic: "Committed" | "CredentialRestoredEvent" | "CredentialRevokedEvent" | "Finalized" | "NameUpdated" | "OptionAdded" | "StakeTokenUsed" | "Voted"): EventFragment;
+    getEvent(nameOrSignatureOrTopic: "AuditSnapshotSet" | "Committed" | "CredentialRestoredEvent" | "CredentialRevokedEvent" | "Finalized" | "NameUpdated" | "OptionAdded" | "StakeTokenUsed" | "Voted"): EventFragment;
 
     encodeFunctionData(functionFragment: 'VERSION', values?: undefined): string;
 encodeFunctionData(functionFragment: 'addOption', values: [string]): string;
+encodeFunctionData(functionFragment: 'auditSnapshotRoot', values?: undefined): string;
 encodeFunctionData(functionFragment: 'ballotOf', values: [BytesLike]): string;
 encodeFunctionData(functionFragment: 'ballotStatus', values: [BytesLike]): string;
 encodeFunctionData(functionFragment: 'ballotWeight', values: [BytesLike]): string;
 encodeFunctionData(functionFragment: 'commitEndAt', values?: undefined): string;
 encodeFunctionData(functionFragment: 'commitVote', values: [BytesLike, BytesLike, BytesLike]): string;
 encodeFunctionData(functionFragment: 'commitVoteWithToken', values: [BigNumberish, BytesLike, BytesLike, BytesLike]): string;
-encodeFunctionData(functionFragment: 'computeCommitment', values: [BytesLike, BigNumberish, BytesLike]): string;
+encodeFunctionData(functionFragment: 'computeCommitment', values: [BytesLike, BigNumberish, BytesLike, AddressLike]): string;
 encodeFunctionData(functionFragment: 'credentialDigest', values: [BytesLike]): string;
 encodeFunctionData(functionFragment: 'currentPhase', values?: undefined): string;
 encodeFunctionData(functionFragment: 'endAt', values?: undefined): string;
@@ -47,6 +48,7 @@ encodeFunctionData(functionFragment: 'proposalName', values?: undefined): string
 encodeFunctionData(functionFragment: 'restoreCredential', values: [BytesLike]): string;
 encodeFunctionData(functionFragment: 'revealVote', values: [BytesLike, BigNumberish, BytesLike]): string;
 encodeFunctionData(functionFragment: 'revokeCredential', values: [BytesLike]): string;
+encodeFunctionData(functionFragment: 'setAuditSnapshotRoot', values: [BytesLike]): string;
 encodeFunctionData(functionFragment: 'setName', values: [string]): string;
 encodeFunctionData(functionFragment: 'stakeToken', values?: undefined): string;
 encodeFunctionData(functionFragment: 'stakeTokenAddress', values?: undefined): string;
@@ -54,10 +56,12 @@ encodeFunctionData(functionFragment: 'startAt', values?: undefined): string;
 encodeFunctionData(functionFragment: 'tally', values?: undefined): string;
 encodeFunctionData(functionFragment: 'tokenUsed', values: [BigNumberish]): string;
 encodeFunctionData(functionFragment: 'totalVotes', values?: undefined): string;
+encodeFunctionData(functionFragment: 'verifyAuditCommitment', values: [BytesLike, BytesLike[]]): string;
 encodeFunctionData(functionFragment: 'verifyCredential', values: [BytesLike, BytesLike]): string;
 
     decodeFunctionResult(functionFragment: 'VERSION', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'addOption', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'auditSnapshotRoot', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'ballotOf', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'ballotStatus', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'ballotWeight', data: BytesLike): Result;
@@ -86,6 +90,7 @@ decodeFunctionResult(functionFragment: 'proposalName', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'restoreCredential', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'revealVote', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'revokeCredential', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'setAuditSnapshotRoot', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'setName', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'stakeToken', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'stakeTokenAddress', data: BytesLike): Result;
@@ -93,10 +98,23 @@ decodeFunctionResult(functionFragment: 'startAt', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'tally', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'tokenUsed', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'totalVotes', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'verifyAuditCommitment', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'verifyCredential', data: BytesLike): Result;
   }
 
   
+    export namespace AuditSnapshotSetEvent {
+      export type InputTuple = [root: BytesLike, timestamp: BigNumberish];
+      export type OutputTuple = [root: string, timestamp: bigint];
+      export interface OutputObject {root: string, timestamp: bigint };
+      export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
+      export type Filter = TypedDeferredTopicFilter<Event>
+      export type Log = TypedEventLog<Event>
+      export type LogDescription = TypedLogDescription<Event>
+    }
+
+  
+
     export namespace CommittedEvent {
       export type InputTuple = [commitment: BytesLike, timestamp: BigNumberish];
       export type OutputTuple = [commitment: string, timestamp: bigint];
@@ -170,9 +188,9 @@ decodeFunctionResult(functionFragment: 'verifyCredential', data: BytesLike): Res
   
 
     export namespace StakeTokenUsedEvent {
-      export type InputTuple = [tokenId: BigNumberish, credentialHash: BytesLike, caller: AddressLike];
-      export type OutputTuple = [tokenId: bigint, credentialHash: string, caller: string];
-      export interface OutputObject {tokenId: bigint, credentialHash: string, caller: string };
+      export type InputTuple = [tokenId: BigNumberish];
+      export type OutputTuple = [tokenId: bigint];
+      export interface OutputObject {tokenId: bigint };
       export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
       export type Filter = TypedDeferredTopicFilter<Event>
       export type Log = TypedEventLog<Event>
@@ -243,6 +261,14 @@ decodeFunctionResult(functionFragment: 'verifyCredential', data: BytesLike): Res
     
 
     
+    auditSnapshotRoot: TypedContractMethod<
+      [],
+      [string],
+      'view'
+    >
+    
+
+    
     ballotOf: TypedContractMethod<
       [credentialHash: BytesLike, ],
       [[string, boolean] & {commitment: string, revealed: boolean }],
@@ -292,7 +318,7 @@ decodeFunctionResult(functionFragment: 'verifyCredential', data: BytesLike): Res
 
     
     computeCommitment: TypedContractMethod<
-      [credentialHash: BytesLike, optionIndex: BigNumberish, salt: BytesLike, ],
+      [credentialHash: BytesLike, optionIndex: BigNumberish, salt: BytesLike, committer: AddressLike, ],
       [string],
       'view'
     >
@@ -467,6 +493,14 @@ decodeFunctionResult(functionFragment: 'verifyCredential', data: BytesLike): Res
     
 
     
+    setAuditSnapshotRoot: TypedContractMethod<
+      [root: BytesLike, ],
+      [void],
+      'nonpayable'
+    >
+    
+
+    
     setName: TypedContractMethod<
       [newName: string, ],
       [void],
@@ -523,6 +557,14 @@ decodeFunctionResult(functionFragment: 'verifyCredential', data: BytesLike): Res
     
 
     
+    verifyAuditCommitment: TypedContractMethod<
+      [commitment: BytesLike, proof: BytesLike[], ],
+      [boolean],
+      'view'
+    >
+    
+
+    
     verifyCredential: TypedContractMethod<
       [credentialHash: BytesLike, signature: BytesLike, ],
       [boolean],
@@ -542,6 +584,11 @@ getFunction(nameOrSignature: 'addOption'): TypedContractMethod<
       [label: string, ],
       [void],
       'nonpayable'
+    >;
+getFunction(nameOrSignature: 'auditSnapshotRoot'): TypedContractMethod<
+      [],
+      [string],
+      'view'
     >;
 getFunction(nameOrSignature: 'ballotOf'): TypedContractMethod<
       [credentialHash: BytesLike, ],
@@ -574,7 +621,7 @@ getFunction(nameOrSignature: 'commitVoteWithToken'): TypedContractMethod<
       'nonpayable'
     >;
 getFunction(nameOrSignature: 'computeCommitment'): TypedContractMethod<
-      [credentialHash: BytesLike, optionIndex: BigNumberish, salt: BytesLike, ],
+      [credentialHash: BytesLike, optionIndex: BigNumberish, salt: BytesLike, committer: AddressLike, ],
       [string],
       'view'
     >;
@@ -683,6 +730,11 @@ getFunction(nameOrSignature: 'revokeCredential'): TypedContractMethod<
       [void],
       'nonpayable'
     >;
+getFunction(nameOrSignature: 'setAuditSnapshotRoot'): TypedContractMethod<
+      [root: BytesLike, ],
+      [void],
+      'nonpayable'
+    >;
 getFunction(nameOrSignature: 'setName'): TypedContractMethod<
       [newName: string, ],
       [void],
@@ -718,13 +770,19 @@ getFunction(nameOrSignature: 'totalVotes'): TypedContractMethod<
       [bigint],
       'view'
     >;
+getFunction(nameOrSignature: 'verifyAuditCommitment'): TypedContractMethod<
+      [commitment: BytesLike, proof: BytesLike[], ],
+      [boolean],
+      'view'
+    >;
 getFunction(nameOrSignature: 'verifyCredential'): TypedContractMethod<
       [credentialHash: BytesLike, signature: BytesLike, ],
       [boolean],
       'view'
     >;
 
-    getEvent(key: 'Committed'): TypedContractEvent<CommittedEvent.InputTuple, CommittedEvent.OutputTuple, CommittedEvent.OutputObject>;
+    getEvent(key: 'AuditSnapshotSet'): TypedContractEvent<AuditSnapshotSetEvent.InputTuple, AuditSnapshotSetEvent.OutputTuple, AuditSnapshotSetEvent.OutputObject>;
+getEvent(key: 'Committed'): TypedContractEvent<CommittedEvent.InputTuple, CommittedEvent.OutputTuple, CommittedEvent.OutputObject>;
 getEvent(key: 'CredentialRestoredEvent'): TypedContractEvent<CredentialRestoredEventEvent.InputTuple, CredentialRestoredEventEvent.OutputTuple, CredentialRestoredEventEvent.OutputObject>;
 getEvent(key: 'CredentialRevokedEvent'): TypedContractEvent<CredentialRevokedEventEvent.InputTuple, CredentialRevokedEventEvent.OutputTuple, CredentialRevokedEventEvent.OutputObject>;
 getEvent(key: 'Finalized'): TypedContractEvent<FinalizedEvent.InputTuple, FinalizedEvent.OutputTuple, FinalizedEvent.OutputObject>;
@@ -735,6 +793,10 @@ getEvent(key: 'Voted'): TypedContractEvent<VotedEvent.InputTuple, VotedEvent.Out
 
     filters: {
       
+      'AuditSnapshotSet(bytes32,uint256)': TypedContractEvent<AuditSnapshotSetEvent.InputTuple, AuditSnapshotSetEvent.OutputTuple, AuditSnapshotSetEvent.OutputObject>;
+      AuditSnapshotSet: TypedContractEvent<AuditSnapshotSetEvent.InputTuple, AuditSnapshotSetEvent.OutputTuple, AuditSnapshotSetEvent.OutputObject>;
+    
+
       'Committed(bytes32,uint256)': TypedContractEvent<CommittedEvent.InputTuple, CommittedEvent.OutputTuple, CommittedEvent.OutputObject>;
       Committed: TypedContractEvent<CommittedEvent.InputTuple, CommittedEvent.OutputTuple, CommittedEvent.OutputObject>;
     
@@ -759,7 +821,7 @@ getEvent(key: 'Voted'): TypedContractEvent<VotedEvent.InputTuple, VotedEvent.Out
       OptionAdded: TypedContractEvent<OptionAddedEvent.InputTuple, OptionAddedEvent.OutputTuple, OptionAddedEvent.OutputObject>;
     
 
-      'StakeTokenUsed(uint256,bytes32,address)': TypedContractEvent<StakeTokenUsedEvent.InputTuple, StakeTokenUsedEvent.OutputTuple, StakeTokenUsedEvent.OutputObject>;
+      'StakeTokenUsed(uint256)': TypedContractEvent<StakeTokenUsedEvent.InputTuple, StakeTokenUsedEvent.OutputTuple, StakeTokenUsedEvent.OutputObject>;
       StakeTokenUsed: TypedContractEvent<StakeTokenUsedEvent.InputTuple, StakeTokenUsedEvent.OutputTuple, StakeTokenUsedEvent.OutputObject>;
     
 

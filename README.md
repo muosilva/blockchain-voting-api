@@ -17,13 +17,13 @@ Sistema de votacao totalmente on-chain construido em Solidity com Hardhat. A arq
    - Os tokens podem ser transferidos livremente ate o commit; o novo dono assume o direito de votar naquela pauta.
 
 3. **Commit (on-chain)**
-   - Entre `startAt` e `commitEndAt`, o eleitor calcula `commitment = keccak256(credentialHash, optionIndex, salt)`.
-   - Ele chama `commitVoteWithToken(tokenId, credentialHash, commitment, signature)`.
-   - O contrato verifica a assinatura da autoridade, confere que o chamador e dono (ou aprovado) do token e armazena somente o hash do voto.
+   - Entre `startAt` e `commitEndAt`, o eleitor calcula `commitment = keccak256(credentialHash, optionIndex, salt, committer)` onde `committer` é o endereço do próprio remetente (`msg.sender`).
+   - Ele chama `commitVoteWithToken(tokenId, credentialHash, commitment, signature)` a partir da carteira do dono do token.
+   - O contrato verifica a assinatura da autoridade, confere que o chamador é o dono do token (sem operadores/aproved), vincula o compromisso ao remetente e armazena apenas o hash do voto.
 
 4. **Reveal (on-chain)**
    - Entre `commitEndAt` e `endAt`, o eleitor chama `revealVote(credentialHash, optionIndex, salt)`.
-   - O contrato recomputa o compromisso, valida e incrementa o contador da opcao escolhida.
+   - O contrato recomputa o compromisso incluindo o endereço do remetente que efetuou o commit e valida antes de contar o voto.
 
 5. **Finalizacao**
    - Após `endAt`, qualquer conta pode chamar `finalize()` para emitir o evento `Finalized` com o resultado.

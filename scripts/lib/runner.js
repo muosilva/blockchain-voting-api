@@ -192,7 +192,10 @@ export async function runSimulation(simulation, env) {
     const salt = ethers.hexlify(ethers.randomBytes(32));
     const credentialSecret = ethers.hexlify(ethers.randomBytes(32));
     const credentialHash = ethers.keccak256(credentialSecret);
-    const commitment = ethers.solidityPackedKeccak256(["bytes32", "uint8", "bytes32"], [credentialHash, entry.optionIndex, salt]);
+    const commitment = ethers.solidityPackedKeccak256(
+      ["bytes32", "uint8", "bytes32", "address"],
+      [credentialHash, entry.optionIndex, salt, voterAddress]
+    );
     const msgHash = ethers.solidityPackedKeccak256(["string", "bytes32"], ["SimpleVoting:", credentialHash]);
     const signature = await issuer.signMessage(ethers.getBytes(msgHash));
 
@@ -231,7 +234,38 @@ export async function runSimulation(simulation, env) {
     }
   }
 
+  // Compute Merkle root snapshot of commitments (privacy-preserving, only uses commitment hashes)
+  const leaves = plan.map((p) => p.commitment).filter(Boolean);
+  const hashPair = (a, b) => {
+    const [x, y] = BigInt(a) <= BigInt(b) ? [a, b] : [b, a];
+    return ethers.solidityPackedKeccak256(["bytes32", "bytes32"], [x, y]);
+  };
+  const computeRoot = (leafs) => {
+    if (!leafs || leafs.length === 0) return ethers.ZeroHash;
+    let level = [...leafs];
+    while (level.length > 1) {
+      const next = [];
+      for (let i = 0; i < level.length; i += 2) {
+        if (i + 1 < level.length) next.push(hashPair(level[i], level[i + 1]));
+        else next.push(hashPair(level[i], level[i]));
+      }
+      level = next;
+    }
+    return level[0];
+  };
+  const auditRoot = computeRoot(leaves);
+
   await moveToTimestamp(provider, commitEndAt + 1, { phase: "reveal", label });
+
+  if (auditRoot !== ethers.ZeroHash) {
+    try {
+      const txSnap = await contract.connect(issuer).setAuditSnapshotRoot(auditRoot);
+      await txSnap.wait();
+      console.log("Audit snapshot root set:", auditRoot);
+    } catch (err) {
+      console.log("Falha ao definir audit snapshot root:", err.shortMessage || err.message || String(err));
+    }
+  }
 
   for (const entry of plan) {
     const voter = entry.signer;
