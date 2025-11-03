@@ -11,12 +11,20 @@ import * as Contracts from "./index.js";
 declare module "@nomicfoundation/hardhat-ethers/types" {
   interface HardhatEthersHelpers extends HardhatEthersHelpersBase {
   getContractFactory(name: 'SimpleVoting', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.SimpleVoting__factory>
+getContractFactory(name: 'StakeToken', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.StakeToken__factory>
+getContractFactory(name: 'TokenizedVoting', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.TokenizedVoting__factory>
 
   getContractAt(name: 'SimpleVoting', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.SimpleVoting>
+getContractAt(name: 'StakeToken', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.StakeToken>
+getContractAt(name: 'TokenizedVoting', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.TokenizedVoting>
 
   deployContract(name: 'SimpleVoting', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.SimpleVoting>
+deployContract(name: 'StakeToken', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.StakeToken>
+deployContract(name: 'TokenizedVoting', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.TokenizedVoting>
 
   deployContract(name: 'SimpleVoting', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.SimpleVoting>
+deployContract(name: 'StakeToken', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.StakeToken>
+deployContract(name: 'TokenizedVoting', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.TokenizedVoting>
 
     // default types
     getContractFactory(

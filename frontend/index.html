@@ -1,57 +1,1656 @@
 <!doctype html>
 <html lang="pt-BR">
   <head>
-    <meta charset="utf-8">
-    <title>Resultado da Votação - Simulação</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Governanca PoS - Painel de Votacao</title>
+    <meta name="color-scheme" content="dark light" />
     <style>
-      body { font-family: system-ui, sans-serif; margin: 2rem; background: #f7f7f7; color: #222; }
-      main { background: #fff; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-      h1 { margin-top: 0; }
-      .result-line { font-family: monospace; margin: 0.5rem 0; padding: 0.5rem; background: #f0f0f0; border-radius: 4px; word-break: break-all; }
-      .error { color: #b3261e; }
-      .meta { font-size: 0.9rem; color: #555; margin-bottom: 1rem; }
-    </style>
-  </head>
-  <body>
-    <main>
-      <h1>Resultado da Simulação</h1>
-      <p id="status" class="meta">Carregando dados...</p>
-      <div id="results"></div>
-    </main>
+      :root {
+        --bg: #0a111a;
+        --surface: #121c29;
+        --panel: #182333;
+        --border: #1f2e42;
+        --text: #e6eefc;
+        --muted: #8a9bb6;
+        --accent: #3ddc97;
+        --accent-strong: #2cb67d;
+        --warn: #ffd166;
+        --danger: #ff6b6b;
+        --shadow: 0 18px 30px rgba(6, 12, 21, 0.55);
+        --input: #0f1724;
+        --focus: #356cfa;
+      }
 
-    <script type="module">
-      const statusEl = document.querySelector('#status');
-      const resultsEl = document.querySelector('#results');
+      * {
+        box-sizing: border-box;
+      }
 
-      async function loadSimulation() {
-        try {
-          const response = await fetch('/cache/simulate-result.json', { cache: 'no-store' });
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          const data = await response.json();
+      html,
+      body {
+        height: 100%;
+      }
 
-          if (!Array.isArray(data.votes) || data.votes.length === 0) {
-            statusEl.textContent = 'Nenhum voto encontrado. Execute `npm run simulate` após iniciar o nó local.';
-            return;
-          }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+        background:
+          radial-gradient(1200px 600px at 10% -10%, rgba(118, 169, 250, 0.06), transparent),
+          radial-gradient(1000px 500px at 110% 10%, rgba(185, 148, 255, 0.08), transparent),
+          var(--bg);
+        color: var(--text);
+        -webkit-font-smoothing: antialiased;
+      }
 
-          const header = `Última simulação gerada em ${new Date(data.generatedAt).toLocaleString('pt-BR')} para a pauta "${data.pauta}"`;
-          statusEl.textContent = header;
+      a {
+        color: inherit;
+      }
 
-          data.votes.forEach((vote) => {
-            const line = document.createElement('div');
-            line.className = 'result-line';
-            line.textContent = `${vote.pauta} | ${vote.voteToken} | ${vote.voterToken} | ${vote.voto} | ${vote.start} | ${vote.end}`;
-            resultsEl.appendChild(line);
-          });
-        } catch (error) {
-          statusEl.textContent = 'Erro ao carregar dados da simulação. Confirme se o arquivo cache/simulate-result.json existe.';
-          statusEl.classList.add('error');
-          console.error(error);
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        backdrop-filter: blur(10px);
+        background: linear-gradient(180deg, rgba(12, 20, 32, 0.92), rgba(12, 20, 32, 0.65));
+        border-bottom: 1px solid var(--border);
+      }
+
+      header .wrap {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 18px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      header h1 {
+        margin: 0;
+        font-size: 1.25rem;
+        letter-spacing: 0.3px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .tagline {
+        font-size: 0.88rem;
+        color: var(--muted);
+        margin: 0;
+      }
+
+      .tabs {
+        display: inline-flex;
+        gap: 10px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 6px;
+      }
+
+      .tab-btn {
+        appearance: none;
+        border: 0;
+        background: transparent;
+        color: var(--muted);
+        padding: 8px 18px;
+        border-radius: 999px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: background 0.18s ease, color 0.18s ease;
+      }
+
+      .tab-btn.active {
+        background: var(--accent);
+        color: #041018;
+        box-shadow: 0 0 0 1px rgba(61, 220, 151, 0.3), 0 12px 24px rgba(61, 220, 151, 0.25);
+      }
+
+      main {
+        max-width: 1100px;
+        margin: 20px auto 64px;
+        padding: 0 20px 80px;
+        display: grid;
+        gap: 26px;
+      }
+
+      .screen {
+        display: none;
+        gap: 20px;
+        animation: fade-in 0.2s ease;
+      }
+
+      .screen.active {
+        display: grid;
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+        border-radius: 18px;
+        padding: 22px 24px;
+        display: grid;
+        gap: 18px;
+      }
+
+      .card.compact {
+        padding: 16px 18px;
+        gap: 14px;
+      }
+
+      .card header {
+        position: static;
+        backdrop-filter: none;
+        background: transparent;
+        border: 0;
+        padding: 0;
+      }
+
+      .card-title {
+        margin: 0;
+        font-size: 1.05rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .card-subtitle {
+        margin: 0;
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+
+      .grid {
+        display: grid;
+        gap: 18px;
+      }
+
+      .grid.two {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .grid.three {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      @media (max-width: 980px) {
+        .grid.two,
+        .grid.three {
+          grid-template-columns: 1fr;
         }
       }
 
-      loadSimulation();
+      .group {
+        display: grid;
+        gap: 6px;
+      }
+
+      label {
+        font-size: 0.84rem;
+        color: var(--muted);
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      input,
+      textarea,
+      select,
+      button {
+        font-family: inherit;
+      }
+
+      input[type="text"],
+      input[type="number"],
+      input[type="datetime-local"],
+      textarea,
+      select {
+        background: var(--input);
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 10px 12px;
+        border-radius: 12px;
+        font-size: 0.96rem;
+      }
+
+      textarea {
+        min-height: 90px;
+        resize: vertical;
+      }
+
+      input:focus,
+      textarea:focus,
+      select:focus {
+        outline: 2px solid var(--focus);
+        outline-offset: 2px;
+      }
+
+      button {
+        appearance: none;
+        border: 1px solid var(--border);
+        background: var(--input);
+        color: var(--text);
+        padding: 10px 16px;
+        border-radius: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.08s ease, background 0.18s ease, box-shadow 0.18s ease;
+      }
+
+      button:hover {
+        background: rgba(61, 220, 151, 0.12);
+        box-shadow: 0 12px 22px rgba(12, 24, 38, 0.24);
+      }
+
+      button:active {
+        transform: translateY(1px);
+      }
+
+      button.primary {
+        background: linear-gradient(120deg, var(--accent), var(--accent-strong));
+        border-color: rgba(61, 220, 151, 0.35);
+        color: #041018;
+      }
+
+      button.ghost {
+        background: transparent;
+        border-color: rgba(255, 255, 255, 0.08);
+      }
+
+      button.small {
+        padding: 6px 12px;
+        border-radius: 10px;
+        font-size: 0.85rem;
+      }
+
+      .option-line {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .option-line input {
+        flex: 1;
+      }
+
+      .list {
+        display: grid;
+        gap: 16px;
+      }
+
+      .pauta-card {
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 16px;
+        padding: 16px 18px;
+        background: rgba(15, 24, 36, 0.74);
+        display: grid;
+        gap: 10px;
+      }
+
+      .pauta-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+        justify-content: space-between;
+      }
+
+      .pauta-title {
+        margin: 0;
+        font-size: 1rem;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--muted);
+      }
+
+      .badge.open {
+        background: rgba(61, 220, 151, 0.15);
+        color: var(--accent);
+      }
+
+      .badge.closed {
+        background: rgba(255, 107, 107, 0.12);
+        color: var(--danger);
+      }
+
+      .badge.pending {
+        background: rgba(118, 169, 250, 0.12);
+        color: #76a9fa;
+      }
+
+      .badge.success {
+        background: rgba(61, 220, 151, 0.2);
+        color: var(--accent);
+      }
+
+      .options-grid {
+        display: grid;
+        gap: 10px;
+      }
+
+      .option-tile {
+        border: 1px dashed rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        padding: 10px 14px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .option-tile strong {
+        font-size: 0.95rem;
+      }
+
+      .meta-line {
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+
+      .token-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border-radius: 999px;
+        padding: 6px 12px;
+        background: rgba(118, 169, 250, 0.12);
+        border: 1px solid rgba(118, 169, 250, 0.24);
+        color: #cdd9f5;
+      }
+
+      .token-pill.used {
+        background: rgba(255, 107, 107, 0.12);
+        border-color: rgba(255, 107, 107, 0.24);
+        color: #ff9c9c;
+      }
+
+      .tokens-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .flex {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .flex.space {
+        justify-content: space-between;
+      }
+
+      .divider {
+        height: 1px;
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .mono {
+        font-family: "SFMono-Regular", "Consolas", "Liberation Mono", monospace;
+        font-size: 0.84rem;
+        letter-spacing: 0.04em;
+      }
+
+      .output {
+        background: var(--input);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        padding: 14px;
+        font-family: "SFMono-Regular", "Consolas", "Liberation Mono", monospace;
+        font-size: 0.82rem;
+        line-height: 1.5;
+        color: #d6e3ff;
+        max-height: 320px;
+        overflow: auto;
+      }
+
+      .status-line {
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+
+      .table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.86rem;
+      }
+
+      .table thead {
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .table th,
+      .table td {
+        padding: 8px 10px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        text-align: left;
+      }
+
+      .table th {
+        font-weight: 600;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-size: 0.78rem;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        border: 1px solid rgba(118, 169, 250, 0.2);
+        background: rgba(118, 169, 250, 0.12);
+      }
+
+      .chip.option {
+        border-color: rgba(61, 220, 151, 0.25);
+        background: rgba(61, 220, 151, 0.18);
+        color: var(--accent);
+      }
+
+      .chip.tx {
+        border-color: rgba(255, 209, 102, 0.25);
+        background: rgba(255, 209, 102, 0.14);
+        color: var(--warn);
+      }
+
+      .chip.addr {
+        border-color: rgba(185, 148, 255, 0.25);
+        background: rgba(185, 148, 255, 0.14);
+        color: #b594ff;
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 20px;
+        right: 24px;
+        background: rgba(12, 18, 28, 0.92);
+        border: 1px solid rgba(61, 220, 151, 0.35);
+        border-radius: 14px;
+        padding: 12px 16px;
+        color: var(--text);
+        font-size: 0.9rem;
+        box-shadow: var(--shadow);
+        animation: toast-in 0.18s ease;
+        pointer-events: none;
+        z-index: 20;
+      }
+
+      @keyframes fade-in {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes toast-in {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="wrap">
+        <div>
+          <h1>Governanca PoS</h1>
+          <p class="tagline">Crie pautas, distribua tokens de stake e organize votacoes com commit-reveal.</p>
+        </div>
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="create">Criar Pauta</button>
+          <button class="tab-btn" data-tab="vote">Votar</button>
+          <button class="tab-btn" data-tab="progress">Progresso</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section id="create-screen" class="screen active">
+        <article class="card">
+          <header>
+            <h2 class="card-title">Nova pauta on-chain</h2>
+            <p class="card-subtitle">
+              Gere rapidamente os parametros necessarios para publicar uma pauta vinculada a um token de stake.
+            </p>
+          </header>
+
+          <form id="create-form" class="grid">
+            <div class="grid two">
+              <div class="group">
+                <label for="create-name">Nome da pauta</label>
+                <input id="create-name" name="name" type="text" placeholder="Assembleia 2025" required />
+              </div>
+              <div class="group">
+                <label for="create-issuer">Endereco do emissor (issuer)</label>
+                <input id="create-issuer" name="issuer" type="text" placeholder="0x..." required />
+              </div>
+            </div>
+
+            <div class="grid two">
+              <div class="group">
+                <label for="create-stake">Endereco do StakeToken</label>
+                <input id="create-stake" name="stake" type="text" placeholder="0x..." required />
+              </div>
+              <div class="group">
+                <label for="create-chain">Chain ID (opcional)</label>
+                <input id="create-chain" name="chainId" type="number" min="1" placeholder="31337" />
+              </div>
+            </div>
+
+            <div class="grid three">
+              <div class="group">
+                <label for="create-start">Inicio do commit</label>
+                <input id="create-start" name="startAt" type="datetime-local" required />
+              </div>
+              <div class="group">
+                <label for="create-commit-end">Fim do commit</label>
+                <input id="create-commit-end" name="commitEndAt" type="datetime-local" required />
+              </div>
+              <div class="group">
+                <label for="create-end">Fim do reveal</label>
+                <input id="create-end" name="endAt" type="datetime-local" required />
+              </div>
+            </div>
+
+            <div class="group">
+              <label>Opcoes de voto</label>
+              <div id="option-list" class="grid"></div>
+              <button type="button" id="add-option" class="small ghost">Adicionar opcao</button>
+            </div>
+
+            <div class="flex space">
+              <button type="submit" class="primary">Gerar configuracao</button>
+              <button type="button" id="copy-config" class="ghost small">Copiar JSON</button>
+            </div>
+          </form>
+
+          <div class="group">
+            <label>Pre-visualizacao</label>
+            <pre id="create-output" class="output">Preencha o formulario acima para gerar a configuracao.</pre>
+            <p id="create-feedback" class="status-line"></p>
+          </div>
+        </article>
+      </section>
+
+      <section id="vote-screen" class="screen">
+        <article class="card">
+          <header>
+            <h2 class="card-title">Minha carteira PoS</h2>
+            <p class="card-subtitle">
+              Conecte sua carteira, leia os tokens de stake disponiveis e acompanhe o status de uso em cada pauta.
+            </p>
+          </header>
+
+          <div class="grid two">
+            <div class="card compact">
+              <div class="flex space">
+                <div class="group" style="gap: 4px;">
+                  <span class="muted">Carteira conectada</span>
+                  <strong id="wallet-address" class="mono"></strong>
+                </div>
+                <button id="connect-wallet" class="primary small">Conectar</button>
+              </div>
+              <div class="divider"></div>
+              <div class="group">
+                <label for="stake-address">StakeToken</label>
+                <input id="stake-address" type="text" placeholder="0x..." />
+              </div>
+              <div class="group">
+                <span class="muted">Tokens disponiveis</span>
+                <div id="token-list" class="tokens-list"></div>
+              </div>
+              <p id="wallet-feedback" class="status-line"></p>
+            </div>
+
+            <div class="card compact">
+              <div class="group">
+                <label for="source-list">Fontes (JSON)</label>
+                <textarea id="source-list" spellcheck="false"></textarea>
+              </div>
+              <div class="flex space">
+                <div class="flex" style="gap: 8px;">
+                  <button id="load-sources" class="primary small">Carregar dados</button>
+                  <button id="refresh-sources" class="ghost small">Atualizar</button>
+                </div>
+                <span id="sources-status" class="status-line"></span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <header>
+            <h2 class="card-title">Votacoes em aberto</h2>
+            <p class="card-subtitle">
+              Selecione uma pauta para enxergar a janela ativa e enviar seu commit usando um token de stake.
+            </p>
+          </header>
+
+          <div id="pautas-list" class="list"></div>
+        </article>
+
+        <article class="card">
+          <header>
+            <h2 class="card-title">Emitir voto (Commit)</h2>
+            <p class="card-subtitle">
+              Informe as credenciais blindadas emitidas pela autoridade e submeta o commit usando o token escolhido.
+            </p>
+          </header>
+
+          <form id="vote-form" class="grid">
+            <div class="grid two">
+              <div class="group">
+                <label for="pauta-select">Pauta</label>
+                <select id="pauta-select">
+                  <option value="">Selecione...</option>
+                </select>
+              </div>
+              <div class="group">
+                <label for="token-select">Token de stake</label>
+                <select id="token-select">
+                  <option value="">Selecione...</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="group">
+              <label>Opcoes disponiveis</label>
+              <div id="vote-options" class="options-grid"></div>
+              <p id="vote-window" class="status-line"></p>
+            </div>
+
+            <div class="grid two">
+              <div class="group">
+                <label for="credential-hash">Credential hash (bytes32)</label>
+                <input id="credential-hash" type="text" placeholder="0x..." autocomplete="off" />
+              </div>
+              <div class="group">
+                <label for="credential-signature">Assinatura da autoridade</label>
+                <input id="credential-signature" type="text" placeholder="0x..." autocomplete="off" />
+              </div>
+            </div>
+
+            <div class="grid two">
+              <div class="group">
+                <label for="commitment-input">Commitment</label>
+                <input id="commitment-input" type="text" placeholder="0x..." autocomplete="off" />
+              </div>
+              <div class="group">
+                <label for="salt-input">Salt (bytes32)</label>
+                <input id="salt-input" type="text" placeholder="0x..." autocomplete="off" />
+              </div>
+            </div>
+
+            <div class="flex space">
+              <button type="button" id="generate-commit" class="ghost small">Gerar commitment</button>
+              <button type="submit" class="primary">Enviar commit</button>
+            </div>
+          </form>
+
+          <p id="commit-feedback" class="status-line"></p>
+        </article>
+
+        <article class="card">
+          <header>
+            <h2 class="card-title">Revelar voto</h2>
+            <p class="card-subtitle">
+              Apos o fim do commit, informe o mesmo credential hash, a opcao escolhida e o salt utilizado para contar o voto.
+            </p>
+          </header>
+
+          <form id="reveal-form" class="grid">
+            <div class="grid two">
+              <div class="group">
+                <label for="reveal-pauta">Pauta</label>
+                <select id="reveal-pauta">
+                  <option value="">Selecione...</option>
+                </select>
+              </div>
+              <div class="group">
+                <label for="reveal-option">Opcao (indice)</label>
+                <input id="reveal-option" type="number" min="0" placeholder="0" />
+              </div>
+            </div>
+
+            <div class="grid two">
+              <div class="group">
+                <label for="reveal-credential">Credential hash</label>
+                <input id="reveal-credential" type="text" placeholder="0x..." />
+              </div>
+              <div class="group">
+                <label for="reveal-salt">Salt</label>
+                <input id="reveal-salt" type="text" placeholder="0x..." />
+              </div>
+            </div>
+
+            <div class="flex space">
+              <button type="submit" class="primary">Enviar reveal</button>
+              <span id="reveal-feedback" class="status-line"></span>
+            </div>
+          </form>
+        </article>
+      </section>
+
+      <section id="progress-screen" class="screen">
+        <article class="card">
+          <header>
+            <h2 class="card-title">Progresso das pautas em aberto</h2>
+            <p class="card-subtitle">
+              Acompanhe votos registrados durante as janelas de commit e reveal e veja quem ja utilizou cada token de stake.
+            </p>
+          </header>
+
+          <div id="progress-summary" class="status-line"></div>
+          <div id="progress-list" class="list"></div>
+        </article>
+      </section>
+    </main>
+
+    <template id="option-template">
+      <div class="option-line">
+        <input type="text" placeholder="Nome da opcao" required />
+        <button type="button" class="ghost small remove-option">Remover</button>
+      </div>
+    </template>
+
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.1/dist/ethers.umd.min.js"></script>
+    <script>
+      (() => {
+        const $ = (selector, root = document) => root.querySelector(selector);
+        const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+
+        const tabButtons = Array.from(document.querySelectorAll(".tab-btn"));
+        const screens = Array.from(document.querySelectorAll(".screen"));
+
+        function switchTab(id) {
+          tabButtons.forEach((btn) => btn.classList.toggle("active", btn.dataset.tab === id));
+          screens.forEach((section) => section.classList.toggle("active", section.id.startsWith(id)));
+        }
+
+        tabButtons.forEach((btn) => btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
+
+        const optionTemplate = document.getElementById("option-template");
+        const optionListEl = document.getElementById("option-list");
+        const addOptionBtn = document.getElementById("add-option");
+        const createForm = document.getElementById("create-form");
+        const createOutput = document.getElementById("create-output");
+        const copyBtn = document.getElementById("copy-config");
+        const createFeedback = document.getElementById("create-feedback");
+
+        function addOptionField(value = "") {
+          const fragment = optionTemplate.content.cloneNode(true);
+          const line = fragment.querySelector(".option-line");
+          const input = line.querySelector("input");
+          const removeBtn = line.querySelector(".remove-option");
+          input.value = value;
+          removeBtn.addEventListener("click", () => line.remove());
+          optionListEl.appendChild(fragment);
+        }
+
+        function getOptionValues() {
+          return Array.from(optionListEl.querySelectorAll("input"))
+            .map((input) => input.value.trim())
+            .filter(Boolean);
+        }
+
+        addOptionBtn.addEventListener("click", () => addOptionField(""));
+
+        if (!optionListEl.children.length) {
+          addOptionField("Sim");
+          addOptionField("Nao");
+        }
+
+        function parseDate(value) {
+          if (!value) return null;
+          const timestamp = Date.parse(value);
+          return Number.isFinite(timestamp) ? Math.floor(timestamp / 1000) : null;
+        }
+
+        function showToast(message) {
+          const toast = document.createElement("div");
+          toast.className = "toast";
+          toast.textContent = message;
+          document.body.appendChild(toast);
+          setTimeout(() => toast.remove(), 2600);
+        }
+
+        function serializeCreateForm(form) {
+          const data = new FormData(form);
+          const name = (data.get("name") || "").trim();
+          const issuer = (data.get("issuer") || "").trim();
+          const stake = (data.get("stake") || "").trim();
+          const chainIdValue = data.get("chainId");
+          const startAt = parseDate(data.get("startAt"));
+          const commitEndAt = parseDate(data.get("commitEndAt"));
+          const endAt = parseDate(data.get("endAt"));
+          const options = getOptionValues();
+
+          if (!name || !issuer || !stake) {
+            throw new Error("Preencha nome, emissor e endereco do StakeToken.");
+          }
+          if (!startAt || !commitEndAt || !endAt) {
+            throw new Error("Datas invalidas. Utilize datetime-local.");
+          }
+          if (!(startAt < commitEndAt && commitEndAt < endAt)) {
+            throw new Error("Respeite a ordem: inicio < fim do commit < fim do reveal.");
+          }
+          if (options.length < 2) {
+            throw new Error("Informe pelo menos duas opcoes.");
+          }
+
+          return {
+            name,
+            issuer,
+            stakeToken: stake,
+            chainId: chainIdValue ? Number(chainIdValue) : undefined,
+            schedule: { startAt, commitEndAt, endAt },
+            options,
+            iso: {
+              start: new Date(startAt * 1000).toISOString(),
+              commitEnd: new Date(commitEndAt * 1000).toISOString(),
+              end: new Date(endAt * 1000).toISOString()
+            }
+          };
+        }
+
+        createForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          try {
+            const payload = serializeCreateForm(createForm);
+            const snippet = {
+              name: payload.name,
+              options: payload.options,
+              issuer: payload.issuer,
+              stakeToken: payload.stakeToken,
+              schedule: payload.schedule,
+              timestampsISO: payload.iso
+            };
+            createOutput.textContent = JSON.stringify(snippet, null, 2);
+            createFeedback.textContent = "Configuracao gerada. Utilize estes dados no deploy.";
+          } catch (error) {
+            createOutput.textContent = "";
+            createFeedback.textContent = error.message;
+          }
+        });
+
+        copyBtn.addEventListener("click", async () => {
+          const text = createOutput.textContent || "";
+          if (!text.trim()) return;
+          try {
+            await navigator.clipboard.writeText(text);
+            showToast("Configuracao copiada.");
+          } catch (error) {
+            createFeedback.textContent = "Nao foi possivel copiar automaticamente.";
+          }
+        });
+
+        // ======== VOTE DASHBOARD ========
+        const { ethers } = window;
+        if (!ethers) return;
+        const { BrowserProvider, Contract, isAddress, getAddress, solidityPackedKeccak256, zeroPadValue } = ethers;
+
+        const connectBtn = document.getElementById("connect-wallet");
+        const walletAddressEl = document.getElementById("wallet-address");
+        const stakeInput = document.getElementById("stake-address");
+        const tokenListEl = document.getElementById("token-list");
+        const walletFeedback = document.getElementById("wallet-feedback");
+
+        const sourcesTextarea = document.getElementById("source-list");
+        const loadSourcesBtn = document.getElementById("load-sources");
+        const refreshSourcesBtn = document.getElementById("refresh-sources");
+        const sourcesStatus = document.getElementById("sources-status");
+        const pautasListEl = document.getElementById("pautas-list");
+        const progressListEl = document.getElementById("progress-list");
+        const progressSummaryEl = document.getElementById("progress-summary");
+
+        const pautaSelect = document.getElementById("pauta-select");
+        const revealPautaSelect = document.getElementById("reveal-pauta");
+        const tokenSelect = document.getElementById("token-select");
+        const voteOptionsBox = document.getElementById("vote-options");
+        const voteWindowText = document.getElementById("vote-window");
+        const voteForm = document.getElementById("vote-form");
+        const revealForm = document.getElementById("reveal-form");
+        const commitFeedback = document.getElementById("commit-feedback");
+        const revealFeedback = document.getElementById("reveal-feedback");
+        const generateCommitBtn = document.getElementById("generate-commit");
+
+        const credentialHashInput = document.getElementById("credential-hash");
+        const credentialSignatureInput = document.getElementById("credential-signature");
+        const commitmentInput = document.getElementById("commitment-input");
+        const saltInput = document.getElementById("salt-input");
+
+        const revealCredentialInput = document.getElementById("reveal-credential");
+        const revealSaltInput = document.getElementById("reveal-salt");
+        const revealOptionInput = document.getElementById("reveal-option");
+
+        const state = {
+          wallet: { provider: null, signer: null, address: null },
+          pautas: [],
+          selectedPautaId: null,
+          tokens: [],
+          tokenUsage: new Map()
+        };
+
+        const STORAGE_KEYS = {
+          stake: "posvote.stakeAddress",
+          sources: "posvote.sources"
+        };
+
+        const STAKE_TOKEN_ABI = [
+          "function tokensOfOwner(address owner) view returns (uint256[] memory)",
+          "function balanceOf(address owner) view returns (uint256)",
+          "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)"
+        ];
+
+        const VOTING_ABI = [
+          "function stakeTokenAddress() view returns (address)",
+          "function tokenUsed(uint256 tokenId) view returns (bool)",
+          "function commitVoteWithToken(uint256 tokenId, bytes32 credentialHash, bytes32 commitment, bytes signature)",
+          "function revealVote(bytes32 credentialHash, uint8 optionIndex, bytes32 salt)",
+          "function metadata() view returns (tuple(string name,address owner,address issuer,uint256 startAt,uint256 commitEndAt,uint256 endAt,uint8 phase,bool finalized,uint256 optionCount,uint256 totalVotes))",
+          "function optionDetails() view returns (string[] memory,uint256[] memory)"
+        ];
+
+        function setWalletFeedback(message) {
+          walletFeedback.textContent = message || "";
+        }
+
+        async function connectWallet() {
+          if (!window.ethereum) {
+            setWalletFeedback("Instale uma carteira (ex: MetaMask) para interagir.");
+            return;
+          }
+          try {
+            const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+            state.wallet.provider = new BrowserProvider(window.ethereum);
+            state.wallet.signer = await state.wallet.provider.getSigner();
+            state.wallet.address = getAddress(accounts[0]);
+            walletAddressEl.textContent = state.wallet.address;
+            setWalletFeedback("Carteira conectada.");
+            if (window.ethereum.on) {
+              window.ethereum.on("accountsChanged", handleAccountsChanged);
+            }
+            await refreshStakeTokens();
+          } catch (error) {
+            setWalletFeedback(error.message || "Falha ao conectar carteira.");
+          }
+        }
+
+        async function handleAccountsChanged(accounts) {
+          if (!accounts.length) {
+            state.wallet.address = null;
+            walletAddressEl.textContent = "";
+            state.tokens = [];
+            renderTokens();
+            return;
+          }
+          state.wallet.address = getAddress(accounts[0]);
+          walletAddressEl.textContent = state.wallet.address;
+          await refreshStakeTokens();
+        }
+
+        async function fetchTokensWithFallback(contract, owner) {
+          try {
+            const tokens = await contract.tokensOfOwner(owner);
+            if (Array.isArray(tokens)) {
+              return tokens.map((value) => value.toString());
+            }
+          } catch (error) {
+            // fallback
+          }
+          const balance = Number(await contract.balanceOf(owner));
+          const result = [];
+          for (let i = 0; i < balance; i++) {
+            const tokenId = await contract.tokenOfOwnerByIndex(owner, i);
+            result.push(tokenId.toString());
+          }
+          return result;
+        }
+
+        function renderTokens() {
+          tokenListEl.innerHTML = "";
+          tokenSelect.innerHTML = '<option value="">Selecione...</option>';
+          if (!state.tokens.length) {
+            const span = document.createElement("span");
+            span.className = "muted";
+            span.textContent = "Nenhum token localizado.";
+            tokenListEl.appendChild(span);
+            return;
+          }
+          for (const token of state.tokens) {
+            const used = state.tokenUsage.get(token);
+            const pill = document.createElement("span");
+            pill.className = used ? "token-pill used" : "token-pill";
+            pill.textContent = `#${BigInt(token).toString()}`;
+            tokenListEl.appendChild(pill);
+
+            const option = document.createElement("option");
+            option.value = token;
+            option.textContent = `Token #${BigInt(token).toString()}${used ? " (usado)" : ""}`;
+            option.disabled = used;
+            tokenSelect.appendChild(option);
+          }
+        }
+
+        async function refreshStakeTokens() {
+          setWalletFeedback("");
+          if (!state.wallet.signer || !state.wallet.address) {
+            setWalletFeedback("Conecte a carteira para listar tokens.");
+            return;
+          }
+          const stakeAddress = stakeInput.value.trim();
+          if (!isAddress(stakeAddress)) {
+            setWalletFeedback("Informe o endereco do StakeToken.");
+            return;
+          }
+          try {
+            const contract = new Contract(stakeAddress, STAKE_TOKEN_ABI, state.wallet.provider);
+            const tokens = await fetchTokensWithFallback(contract, state.wallet.address);
+            state.tokens = tokens;
+            renderTokens();
+            setWalletFeedback(tokens.length ? "" : "Nenhum token encontrado para esta carteira.");
+            await updateTokenUsage();
+          } catch (error) {
+            setWalletFeedback("Falha ao ler tokens: " + (error.shortMessage || error.message));
+          }
+        }
+
+        async function updateTokenUsage() {
+          state.tokenUsage.clear();
+          const pauta = state.pautas.find((item) => item.id === state.selectedPautaId);
+          if (!pauta || !isAddress(pauta.contractAddress)) {
+            renderTokens();
+            return;
+          }
+          try {
+            const provider = state.wallet.provider || new BrowserProvider(window.ethereum);
+            const contract = new Contract(pauta.contractAddress, VOTING_ABI, provider);
+            for (const token of state.tokens) {
+              const used = await contract.tokenUsed(token);
+              state.tokenUsage.set(token, used);
+            }
+          } catch (error) {
+            console.warn("Falha ao ler uso dos tokens:", error);
+          }
+          renderTokens();
+        }
+
+        connectBtn.addEventListener("click", connectWallet);
+        stakeInput.addEventListener("change", () => {
+          localStorage.setItem(STORAGE_KEYS.stake, stakeInput.value.trim());
+          refreshStakeTokens();
+        });
+
+        function normalizePayload(payload) {
+          if (!payload) return [];
+          if (Array.isArray(payload)) return payload.flatMap(normalizePayload);
+          if (payload.metadata && payload.optionLabels) {
+            const id = (payload.contractAddress || payload.metadata.contractAddress || "").toLowerCase();
+            return [
+              {
+                id: id || crypto.randomUUID(),
+                name: payload.metadata.name || "Pauta",
+                contractAddress: payload.contractAddress || payload.metadata.contractAddress || "",
+                stakeTokenAddress: payload.stakeTokenAddress || "",
+                metadata: payload.metadata,
+                optionLabels: payload.optionLabels || [],
+                optionCounts: payload.optionCounts || [],
+                startISO: payload.startISO,
+                commitEndISO: payload.commitEndISO,
+                endISO: payload.endISO,
+                phase: payload.metadata.currentPhase ?? payload.metadata.phase,
+                votes: payload.votes || []
+              }
+            ];
+          }
+          return [];
+        }
+
+        function phaseLabel(phase) {
+          switch (Number(phase)) {
+            case 0:
+              return { label: "Nao comecou", className: "badge pending" };
+            case 1:
+              return { label: "Commit aberto", className: "badge open" };
+            case 2:
+              return { label: "Reveal aberto", className: "badge open" };
+            case 3:
+              return { label: "Encerrado", className: "badge closed" };
+            default:
+              return { label: "Desconhecido", className: "badge" };
+          }
+        }
+
+        function isOpenPhase(phase) {
+          const value = Number(phase);
+          return value === 1 || value === 2;
+        }
+
+        function shortAddress(address) {
+          if (!address) return "-";
+          const value = address.toString();
+          return value.length > 10 ? `${value.slice(0, 6)}...${value.slice(-4)}` : value;
+        }
+
+        function formatTimestamp(seconds, fallbackISO) {
+          if (Number.isFinite(seconds) && seconds > 0) {
+            return new Date(seconds * 1000).toISOString();
+          }
+          if (fallbackISO) return fallbackISO;
+          return "-";
+        }
+
+        function renderPautas() {
+          pautasListEl.innerHTML = "";
+          pautaSelect.innerHTML = '<option value="">Selecione...</option>';
+          revealPautaSelect.innerHTML = '<option value="">Selecione...</option>';
+
+          if (!state.pautas.length) {
+            const p = document.createElement("p");
+            p.className = "muted";
+            p.textContent = "Nenhuma pauta carregada. Adicione uma fonte JSON.";
+            pautasListEl.appendChild(p);
+            renderProgress();
+            return;
+          }
+
+          for (const pauta of state.pautas) {
+            const card = document.createElement("div");
+            card.className = "pauta-card";
+            if (state.selectedPautaId === pauta.id) {
+              card.style.border = "1px solid rgba(61, 220, 151, 0.35)";
+            }
+
+            const header = document.createElement("div");
+            header.className = "pauta-header";
+            const title = document.createElement("h3");
+            title.className = "pauta-title";
+            title.textContent = pauta.name;
+            header.appendChild(title);
+
+            const badge = document.createElement("span");
+            const phase = phaseLabel(pauta.phase);
+            badge.className = phase.className;
+            badge.textContent = phase.label;
+            header.appendChild(badge);
+            card.appendChild(header);
+
+            const addressLine = document.createElement("div");
+            addressLine.className = "meta-line mono";
+            addressLine.textContent = pauta.contractAddress
+              ? `Contrato: ${pauta.contractAddress}`
+              : "Contrato nao informado";
+            card.appendChild(addressLine);
+
+            if (pauta.startISO && pauta.commitEndISO && pauta.endISO) {
+              const schedule = document.createElement("div");
+              schedule.className = "meta-line";
+              schedule.textContent = `Commit: ${pauta.startISO} -> ${pauta.commitEndISO} | Reveal ate ${pauta.endISO}`;
+              card.appendChild(schedule);
+            }
+
+            const optionsBlock = document.createElement("div");
+            optionsBlock.className = "options-grid";
+            pauta.optionLabels.forEach((label, index) => {
+              const tile = document.createElement("div");
+              tile.className = "option-tile";
+              const strong = document.createElement("strong");
+              strong.textContent = label;
+              tile.appendChild(strong);
+              const count = document.createElement("span");
+              const votes = pauta.optionCounts[index] ?? 0;
+              count.className = "muted";
+              count.textContent = `${votes} voto(s)`;
+              tile.appendChild(count);
+              optionsBlock.appendChild(tile);
+            });
+            card.appendChild(optionsBlock);
+
+            const actions = document.createElement("div");
+            actions.className = "flex space";
+            const selectBtn = document.createElement("button");
+            selectBtn.className = "small";
+            selectBtn.textContent = "Selecionar pauta";
+            selectBtn.addEventListener("click", () => {
+              setActivePauta(pauta.id);
+              showToast(`Pauta "${pauta.name}" selecionada.`);
+            });
+            actions.appendChild(selectBtn);
+
+            const totalSpan = document.createElement("span");
+            totalSpan.className = "status-line";
+            const totalVotes =
+              pauta.metadata?.totalVotes ?? pauta.optionCounts.reduce((sum, value) => sum + Number(value || 0), 0);
+            totalSpan.textContent = `Total apurado: ${totalVotes}`;
+            actions.appendChild(totalSpan);
+
+            card.appendChild(actions);
+            pautasListEl.appendChild(card);
+
+            const option = document.createElement("option");
+            option.value = pauta.id;
+            option.textContent = pauta.name;
+            pautaSelect.appendChild(option);
+
+            const optionReveal = option.cloneNode(true);
+            revealPautaSelect.appendChild(optionReveal);
+          }
+
+          renderProgress();
+        }
+
+        function renderProgress() {
+          if (!progressListEl || !progressSummaryEl) return;
+          progressListEl.innerHTML = "";
+
+          const openPautas = state.pautas.filter((pauta) => isOpenPhase(pauta.phase));
+          progressSummaryEl.textContent = openPautas.length
+            ? `Pautas em aberto: ${openPautas.length}`
+            : "Nenhuma pauta aberta no momento.";
+
+          if (!openPautas.length) {
+            const empty = document.createElement("p");
+            empty.className = "muted";
+            empty.textContent = "Carregue fontes ou aguarde novas pautas para acompanhar o progresso.";
+            progressListEl.appendChild(empty);
+            return;
+          }
+
+          for (const pauta of openPautas) {
+            const card = document.createElement("div");
+            card.className = "pauta-card";
+
+            const header = document.createElement("div");
+            header.className = "pauta-header";
+
+            const title = document.createElement("h3");
+            title.className = "pauta-title";
+            title.textContent = pauta.name;
+            header.appendChild(title);
+
+            const badge = document.createElement("span");
+            badge.className = "badge open";
+            badge.textContent = phaseLabel(pauta.phase).label;
+            header.appendChild(badge);
+            card.appendChild(header);
+
+            if (pauta.startISO && pauta.commitEndISO && pauta.endISO) {
+              const schedule = document.createElement("div");
+              schedule.className = "meta-line";
+              schedule.textContent = `Janela commit: ${pauta.startISO} -> ${pauta.commitEndISO} | Reveal ate ${pauta.endISO}`;
+              card.appendChild(schedule);
+            }
+
+            if (pauta.stakeTokenAddress) {
+              const stakeLine = document.createElement("div");
+              stakeLine.className = "meta-line mono";
+              stakeLine.textContent = `StakeToken: ${pauta.stakeTokenAddress}`;
+              card.appendChild(stakeLine);
+            }
+
+            const votes = Array.isArray(pauta.votes) ? pauta.votes : [];
+            const usedTokens = votes.length;
+
+            const usageLine = document.createElement("div");
+            usageLine.className = "status-line";
+            usageLine.textContent = `Tokens usados: ${usedTokens} | Total contabilizado: ${
+              pauta.metadata?.totalVotes ?? "-"
+            }`;
+            card.appendChild(usageLine);
+
+            if (!votes.length) {
+              const none = document.createElement("p");
+              none.className = "muted";
+              none.textContent = "Nenhum commit registrado ainda para esta pauta.";
+              card.appendChild(none);
+            } else {
+              const table = document.createElement("table");
+              table.className = "table";
+
+              const thead = document.createElement("thead");
+              thead.innerHTML = `
+                <tr>
+                  <th>Token</th>
+                  <th>Carteira</th>
+                  <th>Opcao</th>
+                  <th>Commit</th>
+                  <th>Reveal</th>
+                  <th>Transacoes</th>
+                </tr>`;
+              table.appendChild(thead);
+
+              const tbody = document.createElement("tbody");
+
+              votes.forEach((vote) => {
+                const row = document.createElement("tr");
+
+                const optionLabel =
+                  vote.voto ||
+                  (Number.isInteger(vote.optionIndex) ? pauta.optionLabels[vote.optionIndex] || "-" : "-");
+
+                const commitTime = formatTimestamp(vote.commitTimestamp, vote.commitISO);
+                const revealTime = formatTimestamp(vote.revealTimestamp, vote.revealISO);
+
+                row.innerHTML = `
+                  <td>
+                    <span class="chip option">#${vote.stakeTokenId || "-"}</span>
+                  </td>
+                  <td>
+                    <div>${shortAddress(vote.commitCaller)}</div>
+                    <div class="mono muted vote-hash" style="font-size:0.75rem;"></div>
+                  </td>
+                  <td>${optionLabel || "-"}</td>
+                  <td>${commitTime}</td>
+                  <td>${revealTime}</td>
+                  <td></td>
+                `;
+
+                const hashEl = row.querySelector(".vote-hash");
+                if (hashEl) {
+                  const voterHash = vote.voterToken || "";
+                  if (voterHash) {
+                    hashEl.textContent =
+                      voterHash.length > 18 ? `${voterHash.slice(0, 10)}...${voterHash.slice(-6)}` : voterHash;
+                    hashEl.title = voterHash;
+                  } else {
+                    hashEl.textContent = "-";
+                  }
+                }
+
+                const txCell = row.lastElementChild;
+                if (vote.commitTx) {
+                  const commitChip = document.createElement("span");
+                  commitChip.className = "chip tx";
+                  commitChip.textContent = `Commit ${vote.commitTx.slice(0, 10)}...`;
+                  commitChip.title = vote.commitTx;
+                  txCell.appendChild(commitChip);
+                }
+                if (vote.revealTx) {
+                  const revealChip = document.createElement("span");
+                  revealChip.className = "chip tx";
+                  revealChip.style.marginLeft = "6px";
+                  revealChip.textContent = `Reveal ${vote.revealTx.slice(0, 10)}...`;
+                  revealChip.title = vote.revealTx;
+                  txCell.appendChild(revealChip);
+                }
+
+                tbody.appendChild(row);
+              });
+
+              table.appendChild(tbody);
+              card.appendChild(table);
+            }
+
+            progressListEl.appendChild(card);
+          }
+        }
+
+        function setActivePauta(id) {
+          state.selectedPautaId = id;
+          const pauta = state.pautas.find((item) => item.id === id);
+          pautaSelect.value = id || "";
+          revealPautaSelect.value = id || "";
+          voteOptionsBox.innerHTML = "";
+          voteWindowText.textContent = "";
+
+          if (!pauta) {
+            renderPautas();
+            updateTokenUsage();
+            return;
+          }
+
+          pauta.optionLabels.forEach((label, index) => {
+            const row = document.createElement("label");
+            row.className = "option-tile";
+            const radio = document.createElement("input");
+            radio.type = "radio";
+            radio.name = "vote-option";
+            radio.value = index;
+            radio.style.marginRight = "10px";
+            row.prepend(radio);
+            const span = document.createElement("span");
+            span.textContent = label;
+            row.appendChild(span);
+            voteOptionsBox.appendChild(row);
+          });
+
+          if (pauta.startISO) {
+            voteWindowText.textContent = `Commit: ${pauta.startISO} -> ${pauta.commitEndISO} | Reveal ate ${pauta.endISO}`;
+          }
+
+          renderPautas();
+          updateTokenUsage();
+        }
+
+        pautaSelect.addEventListener("change", (event) => {
+          const id = event.target.value;
+          setActivePauta(id || null);
+        });
+
+        revealPautaSelect.addEventListener("change", (event) => {
+          const id = event.target.value;
+          if (id && id !== state.selectedPautaId) {
+            setActivePauta(id);
+          }
+        });
+
+        async function loadSources() {
+          const lines = sourcesTextarea.value
+            .split(/\r|\n/)
+            .map((line) => line.trim())
+            .filter(Boolean);
+          if (!lines.length) {
+            state.pautas = [];
+            setActivePauta(null);
+            sourcesStatus.textContent = "Nenhuma fonte configurada.";
+            return;
+          }
+          const results = [];
+          let ok = 0;
+          for (const url of lines) {
+            try {
+              const response = await fetch(url, { cache: "no-store" });
+              if (!response.ok) throw new Error(`HTTP ${response.status}`);
+              const payload = await response.json();
+              results.push(...normalizePayload(payload));
+              ok++;
+            } catch (error) {
+              console.warn("Falha ao carregar", url, error);
+            }
+          }
+          state.pautas = results;
+          const previousId = state.selectedPautaId;
+          let nextId = null;
+          if (previousId && results.some((item) => item.id === previousId)) {
+            nextId = previousId;
+          } else if (results.length) {
+            nextId = results[0].id;
+          }
+          setActivePauta(nextId);
+          sourcesStatus.textContent = `${ok} fonte(s) carregada(s).`;
+          localStorage.setItem(STORAGE_KEYS.sources, sourcesTextarea.value);
+        }
+
+        loadSourcesBtn.addEventListener("click", loadSources);
+        refreshSourcesBtn.addEventListener("click", loadSources);
+
+        function normalizeHex(value, size) {
+          if (!value) return null;
+          let hex = value.trim();
+          if (!hex.startsWith("0x")) hex = "0x" + hex;
+          if (size) {
+            try {
+              return zeroPadValue(hex, size);
+            } catch {
+              return hex;
+            }
+          }
+          return hex;
+        }
+
+        function selectedOptionIndex() {
+          const input = document.querySelector('input[name="vote-option"]:checked');
+          return input ? Number(input.value) : null;
+        }
+
+        generateCommitBtn.addEventListener("click", () => {
+          const optionIndex = selectedOptionIndex();
+          const salt = normalizeHex(saltInput.value, 32);
+          const credentialHash = normalizeHex(credentialHashInput.value, 32);
+          if (optionIndex === null) {
+            commitFeedback.textContent = "Selecione a opcao antes de gerar o commitment.";
+            return;
+          }
+          if (!credentialHash || !salt) {
+            commitFeedback.textContent = "Informe credential hash e salt para gerar o commitment.";
+            return;
+          }
+          try {
+            if (!state.wallet || !state.wallet.address) {
+              commitFeedback.textContent = "Conecte a carteira para gerar o commitment (vinculado ao seu endereco).";
+              return;
+            }
+            const commitment = solidityPackedKeccak256(
+              ["bytes32", "uint8", "bytes32", "address"],
+              [credentialHash, optionIndex, salt, state.wallet.address]
+            );
+            commitmentInput.value = commitment;
+            commitFeedback.textContent = "Commitment calculado localmente.";
+          } catch (error) {
+            commitFeedback.textContent = "Erro ao calcular commitment: " + error.message;
+          }
+        });
+
+        voteForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          commitFeedback.textContent = "";
+          if (!state.wallet.signer) {
+            commitFeedback.textContent = "Conecte a carteira antes de enviar o commit.";
+            return;
+          }
+          const pauta = state.pautas.find((item) => item.id === state.selectedPautaId);
+          if (!pauta || !isAddress(pauta.contractAddress)) {
+            commitFeedback.textContent = "Selecione uma pauta valida.";
+            return;
+          }
+          const tokenValue = tokenSelect.value;
+          if (!tokenValue) {
+            commitFeedback.textContent = "Escolha o token a ser usado.";
+            return;
+          }
+          const tokenId = BigInt(tokenValue);
+          const credentialHash = normalizeHex(credentialHashInput.value, 32);
+          const signature = normalizeHex(credentialSignatureInput.value);
+          let commitment = normalizeHex(commitmentInput.value, 32);
+          const salt = normalizeHex(saltInput.value, 32);
+          const optionIndex = selectedOptionIndex();
+
+          if (!credentialHash || !signature) {
+            commitFeedback.textContent = "Credential hash e assinatura sao obrigatorios.";
+            return;
+          }
+          if (optionIndex === null) {
+            commitFeedback.textContent = "Selecione a opcao da pauta.";
+            return;
+          }
+          if (!commitment) {
+            if (!salt) {
+              commitFeedback.textContent = "Informe o commitment pronto ou o salt para geracao.";
+              return;
+            }
+            commitment = solidityPackedKeccak256(
+              ["bytes32", "uint8", "bytes32", "address"],
+              [credentialHash, optionIndex, salt, state.wallet.address]
+            );
+            commitmentInput.value = commitment;
+          }
+
+          try {
+            const contract = new Contract(pauta.contractAddress, VOTING_ABI, state.wallet.signer);
+            const tx = await contract.commitVoteWithToken(tokenId, credentialHash, commitment, signature);
+            commitFeedback.textContent = `Commit enviado. Hash: ${tx.hash}`;
+            showToast("Commit enviado para a rede.");
+            await tx.wait();
+            await updateTokenUsage();
+          } catch (error) {
+            commitFeedback.textContent = error.shortMessage || error.message || "Erro ao enviar commit.";
+          }
+        });
+
+        revealForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          revealFeedback.textContent = "";
+          if (!state.wallet.signer) {
+            revealFeedback.textContent = "Conecte a carteira antes de enviar o reveal.";
+            return;
+          }
+          const pauta = state.pautas.find((item) => item.id === revealPautaSelect.value);
+          if (!pauta || !isAddress(pauta.contractAddress)) {
+            revealFeedback.textContent = "Selecione uma pauta valida.";
+            return;
+          }
+          const option = Number(revealOptionInput.value);
+          const credentialHash = normalizeHex(revealCredentialInput.value, 32);
+          const salt = normalizeHex(revealSaltInput.value, 32);
+          if (!Number.isFinite(option) || option < 0) {
+            revealFeedback.textContent = "Informe o indice da opcao (0, 1, ...).";
+            return;
+          }
+          if (!credentialHash || !salt) {
+            revealFeedback.textContent = "Credential hash e salt sao obrigatorios.";
+            return;
+          }
+          try {
+            const contract = new Contract(pauta.contractAddress, VOTING_ABI, state.wallet.signer);
+            const tx = await contract.revealVote(credentialHash, option, salt);
+            revealFeedback.textContent = `Reveal enviado. Hash: ${tx.hash}`;
+            showToast("Reveal enviado para a rede.");
+            await tx.wait();
+          } catch (error) {
+            revealFeedback.textContent = error.shortMessage || error.message || "Erro ao enviar reveal.";
+          }
+        });
+
+        (function init() {
+          const savedStake = localStorage.getItem(STORAGE_KEYS.stake);
+          if (savedStake) {
+            stakeInput.value = savedStake;
+          }
+          const savedSources = localStorage.getItem(STORAGE_KEYS.sources);
+          sourcesTextarea.value = savedSources && savedSources.trim()
+            ? savedSources
+            : "./cache/simulate-result.json";
+          loadSources();
+        })();
+      })();
     </script>
   </body>
 </html>

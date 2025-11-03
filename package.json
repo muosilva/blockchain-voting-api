@@ -4,7 +4,7 @@
   "description": "Solidity + TS voting solution using ETH as network",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "hardhat clean && hardhat compile && hardhat test",
     "clean": "hardhat clean",
     "build": "hardhat compile",
     "node": "hardhat node",
@@ -29,5 +29,8 @@
     "dotenv": "^17.2.3",
     "hardhat": "^3.0.6",
     "mocha": "^11.7.4"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.4.0"
   }
 }
