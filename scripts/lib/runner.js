@@ -1,7 +1,9 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { performance } from "node:perf_hooks";
 import { moveToTimestamp } from "./provider-utils.js";
 import { buildPlan, mergeTiming, slugify } from "./sim-helpers.js";
+import { computeMetrics } from "./metrics.js";
 
 /**
  * Runs a single simulation scenario: deploys the contract, commits and reveals votes, writes a result file.
@@ -11,6 +13,39 @@ import { buildPlan, mergeTiming, slugify } from "./sim-helpers.js";
  */
 export async function runSimulation(simulation, env) {
   const { ethers, provider, defaults } = env;
+  const blockProvider = typeof provider.getBlock === "function" ? provider : ethers.provider;
+
+  function asBlockTag(value) {
+    if (value === undefined || value === null) return "latest";
+    if (typeof value === "number") return "0x" + value.toString(16);
+    if (typeof value === "bigint") return "0x" + value.toString(16);
+    if (typeof value === "string") {
+      if (value.startsWith("0x") || value === "latest") return value;
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return "0x" + parsed.toString(16);
+    }
+    return "latest";
+  }
+
+  function normalizeTimestamp(block) {
+    if (!block || block.timestamp === undefined || block.timestamp === null) return block;
+    if (typeof block.timestamp === "string") {
+      const parsed = Number(block.timestamp);
+      if (Number.isFinite(parsed)) {
+        return { ...block, timestamp: parsed };
+      }
+    }
+    return block;
+  }
+
+  async function getBlockSafe(blockRef = "latest") {
+    if (blockProvider && typeof blockProvider.getBlock === "function") {
+      return blockProvider.getBlock(blockRef);
+    }
+    const block = await provider.send("eth_getBlockByNumber", [asBlockTag(blockRef), false]);
+    return normalizeTimestamp(block);
+  }
+
   const signers = await ethers.getSigners();
   const signerInfos = await Promise.all(
     signers.map(async (signer, index) => ({
@@ -53,7 +88,7 @@ export async function runSimulation(simulation, env) {
   const tokenConfig = simulation.token ?? null;
 
   const timing = mergeTiming(defaults.timing, simulation.timing);
-  const latestBlock = await provider.getBlock("latest");
+  const latestBlock = await getBlockSafe("latest");
   const now = Number(latestBlock?.timestamp ?? Math.floor(Date.now() / 1000));
   const mintOverhead = isTokenizedVoting && !tokenConfig?.address ? plan.length : 0;
   const commitWindow = Math.max(timing.commitDuration ?? 0, plan.length + mintOverhead + 2);
@@ -69,6 +104,53 @@ export async function runSimulation(simulation, env) {
   let stakeTokenAddress = null;
   const tokenMints = [];
   const tokenTransfers = [];
+  const txTelemetry = [];
+  let auditTelemetry = null;
+
+  async function recordTransaction(type, txResponse, meta = {}) {
+    if (!txResponse?.wait) return null;
+    const startedAt = performance.now();
+    const receipt = await txResponse.wait();
+    const finishedAt = performance.now();
+
+    let timestamp = null;
+    if (receipt?.blockNumber !== undefined && receipt?.blockNumber !== null) {
+      try {
+        const block = await getBlockSafe(receipt.blockNumber);
+        if (block && block.timestamp !== undefined && block.timestamp !== null) {
+          timestamp = Number(block.timestamp);
+        }
+      } catch {
+        timestamp = null;
+      }
+    }
+
+    const gasUsedRaw = receipt?.gasUsed ?? null;
+    const gasPriceRaw = receipt?.effectiveGasPrice ?? receipt?.gasPrice ?? null;
+    const feeWei = gasUsedRaw !== null && gasPriceRaw !== null ? gasUsedRaw * gasPriceRaw : null;
+
+    const telemetryEntry = {
+      type,
+      label: meta.label ?? null,
+      context: meta.context ?? null,
+      actor: meta.actor ?? meta.accountAddress ?? meta.from ?? null,
+      accountAddress: meta.accountAddress ?? meta.from ?? null,
+      optionIndex: Number.isInteger(meta.optionIndex) ? meta.optionIndex : null,
+      tokenId: Number.isFinite(meta.tokenId) ? Number(meta.tokenId) : null,
+      txHash: receipt?.hash ?? null,
+      blockNumber: receipt?.blockNumber ?? null,
+      timestamp,
+      gasUsed: gasUsedRaw !== null ? Number(gasUsedRaw) : null,
+      gasPriceWei: gasPriceRaw !== null ? gasPriceRaw.toString() : null,
+      feeWei: feeWei !== null ? feeWei.toString() : null,
+      feeEth: feeWei !== null ? ethers.formatEther(feeWei) : null,
+      durationMs: Number((finishedAt - startedAt).toFixed(3)),
+      status: receipt?.status === 1 ? "success" : "failed",
+    };
+
+    txTelemetry.push(telemetryEntry);
+    return { receipt, telemetry: telemetryEntry };
+  }
 
   function resolveAccountAddress(value) {
     if (typeof value !== "string") return null;
@@ -127,6 +209,10 @@ export async function runSimulation(simulation, env) {
       const stakeBaseURI = tokenConfig?.baseURI ?? "https://example.com/metadata/stake/";
       stakeToken = await stakeFactory.connect(issuer).deploy(stakeName, stakeSymbol, stakeBaseURI);
       await stakeToken.waitForDeployment();
+      const stakeDeployTx = stakeToken.deploymentTransaction();
+      if (stakeDeployTx) {
+        await recordTransaction("deploy-stake", stakeDeployTx, { actor: issuerAddress, context: label });
+      }
       stakeTokenAddress = await stakeToken.getAddress();
       console.log("StakeToken deploy:", stakeTokenAddress);
     }
@@ -141,10 +227,15 @@ export async function runSimulation(simulation, env) {
         else if (typeof entry === "object") toInfo = resolveSignerByRef(entry.accountIndex ?? entry.address);
         else throw new Error("Entrada invalida em token.mintTo.");
         const mintTx = await stakeToken.connect(issuer).mint(toInfo.address);
-        const receipt = await mintTx.wait();
+        const mintRecord = await recordTransaction("stake-mint", mintTx, {
+          actor: issuerAddress,
+          accountAddress: toInfo.address,
+          context: "pre-mint",
+        });
+        const receipt = mintRecord?.receipt;
         const nextId = await stakeToken.nextTokenId();
         const mintedId = Number(nextId) - 1;
-        tokenMints.push({ to: toInfo.address, tokenId: mintedId, txHash: receipt?.hash });
+        tokenMints.push({ to: toInfo.address, tokenId: mintedId, txHash: receipt?.hash, context: "pre-mint" });
         console.log(`Minted tokenId ${mintedId} to ${toInfo.address}`);
       }
     }
@@ -162,9 +253,19 @@ export async function runSimulation(simulation, env) {
           const owned = await stakeToken.tokensOfOwner(fromInfo.address);
           if (!owned || owned.length === 0) {
             const mintTx = await stakeToken.connect(issuer).mint(fromInfo.address);
-            await mintTx.wait();
+            const mintRecord = await recordTransaction("stake-mint", mintTx, {
+              actor: issuerAddress,
+              accountAddress: fromInfo.address,
+              context: "transfer-prep",
+            });
             const nextId = await stakeToken.nextTokenId();
             tokenId = Number(nextId) - 1;
+            tokenMints.push({
+              to: fromInfo.address,
+              tokenId,
+              txHash: mintRecord?.receipt?.hash,
+              context: "transfer-prep",
+            });
           } else {
             tokenId = Number(owned[0]);
           }
@@ -172,7 +273,13 @@ export async function runSimulation(simulation, env) {
 
         const transferTx = await stakeToken
           .connect(fromInfo.signer)["safeTransferFrom(address,address,uint256)"](fromInfo.address, toInfo.address, tokenId);
-        const receipt = await transferTx.wait();
+        const transferRecord = await recordTransaction("stake-transfer", transferTx, {
+          actor: fromInfo.address,
+          accountAddress: fromInfo.address,
+          context: "pre-config",
+          tokenId,
+        });
+        const receipt = transferRecord?.receipt;
         tokenTransfers.push({ from: fromInfo.address, to: toInfo.address, tokenId, txHash: receipt?.hash });
         console.log(`Transferred tokenId ${tokenId} from ${fromInfo.address} to ${toInfo.address}`);
       }
@@ -198,6 +305,10 @@ export async function runSimulation(simulation, env) {
   const factory = await ethers.getContractFactory(contractName);
   const contract = await factory.connect(issuer).deploy(...deployArgs);
   await contract.waitForDeployment();
+  const contractDeployTx = contract.deploymentTransaction();
+  if (contractDeployTx) {
+    await recordTransaction("deploy-voting", contractDeployTx, { actor: issuerAddress, context: label });
+  }
   const contractAddress = await contract.getAddress();
 
   console.log("Deploy:", contractAddress);
@@ -230,11 +341,16 @@ export async function runSimulation(simulation, env) {
 
       while (!tokenConfig?.address && owned.length <= usedSet.size) {
         const mintTx = await stakeToken.connect(issuer).mint(voterAddress);
-        const receipt = await mintTx.wait();
+        const mintRecord = await recordTransaction("stake-mint", mintTx, {
+          actor: issuerAddress,
+          accountAddress: voterAddress,
+          context: "on-demand",
+        });
+        const receipt = mintRecord?.receipt;
         const nextId = await stakeToken.nextTokenId();
         const mintedId = Number(nextId) - 1;
         owned.push(mintedId);
-        tokenMints.push({ to: voterAddress, tokenId: mintedId, txHash: receipt?.hash });
+        tokenMints.push({ to: voterAddress, tokenId: mintedId, txHash: receipt?.hash, context: "on-demand" });
         console.log(`Minted tokenId ${mintedId} to ${voterAddress} (on-demand)`);
       }
 
@@ -245,7 +361,14 @@ export async function runSimulation(simulation, env) {
       const commitTx = await contract
         .connect(voter)
         .commitVoteWithToken(tokenId, credentialHash, commitment, signature);
-      await commitTx.wait();
+      await recordTransaction("vote-commit", commitTx, {
+        actor: voterAddress,
+        accountAddress: voterAddress,
+        label: entry.label,
+        optionIndex: entry.optionIndex,
+        tokenId,
+        context: "tokenized",
+      });
 
       entry.salt = salt;
       entry.commitment = commitment;
@@ -256,7 +379,13 @@ export async function runSimulation(simulation, env) {
       console.log(`Commit credential ${credentialHash} com tokenId ${tokenId} (conta ${voterAddress})`);
     } else {
       const commitTx = await contract.connect(voter).commitVote(credentialHash, commitment, signature);
-      await commitTx.wait();
+      await recordTransaction("vote-commit", commitTx, {
+        actor: voterAddress,
+        accountAddress: voterAddress,
+        label: entry.label,
+        optionIndex: entry.optionIndex,
+        context: "simple",
+      });
 
       entry.salt = salt;
       entry.commitment = commitment;
@@ -292,7 +421,11 @@ export async function runSimulation(simulation, env) {
   if (auditRoot !== ethers.ZeroHash) {
     try {
       const txSnap = await contract.connect(issuer).setAuditSnapshotRoot(auditRoot);
-      await txSnap.wait();
+      const auditRecord = await recordTransaction("audit-root", txSnap, {
+        actor: issuerAddress,
+        context: label,
+      });
+      auditTelemetry = auditRecord?.telemetry ?? null;
       console.log("Audit snapshot root set:", auditRoot);
     } catch (err) {
       console.log("Falha ao definir audit snapshot root:", err.shortMessage || err.message || String(err));
@@ -303,7 +436,14 @@ export async function runSimulation(simulation, env) {
     const voter = entry.signer;
     const revealAddress = entry.accountAddress ?? (typeof voter.address === "string" ? voter.address : await voter.getAddress());
     const revealTx = await contract.connect(voter).revealVote(entry.credentialHash, entry.optionIndex, entry.salt);
-    await revealTx.wait();
+    await recordTransaction("vote-reveal", revealTx, {
+      actor: revealAddress,
+      accountAddress: revealAddress,
+      label: entry.label,
+      optionIndex: entry.optionIndex,
+      tokenId: entry.tokenId,
+      context: contractName === "TokenizedVoting" ? "tokenized" : "simple",
+    });
 
     const record = {
       voterToken: entry.credentialHash,
@@ -320,6 +460,18 @@ export async function runSimulation(simulation, env) {
   const [leadingIndex, leadingVotes, hasTie] = await contract.leadingOption();
   const version = Number(await contract.VERSION());
   const networkInfo = await ethers.provider.getNetwork();
+  const metadataSummary = {
+    name: metadata.name,
+    owner: metadata.owner,
+    issuer: metadata.issuer,
+    startAt: Number(metadata.startAt),
+    commitEndAt: Number(metadata.commitEndAt),
+    endAt: Number(metadata.endAt),
+    currentPhase: Number(metadata.phase),
+    finalized: metadata.finalized,
+    optionCount: Number(metadata.optionCount),
+    totalVotes: Number(metadata.totalVotes),
+  };
 
   console.log("\nTally:");
   optionLabels.forEach((optionLabel, i) => {
@@ -327,6 +479,21 @@ export async function runSimulation(simulation, env) {
   });
   console.log("Total:", Number(await contract.totalVotes()));
   console.log(hasTie ? "Tie" : `Winner: [${Number(leadingIndex)}] ${optionLabels[Number(leadingIndex)]} com ${Number(leadingVotes)} votos`);
+
+  const metrics = computeMetrics({
+    contractName,
+    schedule: { startAt, commitEndAt, endAt },
+    plan,
+    txTelemetry,
+    tokenMints,
+    tokenTransfers,
+    metadata: metadataSummary,
+    voteRecords,
+    audit: {
+      root: auditRoot,
+      telemetry: auditTelemetry,
+    },
+  });
 
   const outputDirectory = simulation.output?.directory ?? "cache";
   const outputFileName = simulation.output?.file ?? `simulate-${slugify(simulation.id ?? simulation.name ?? label)}.json`;
@@ -361,18 +528,7 @@ export async function runSimulation(simulation, env) {
           name: networkInfo.name,
         },
         version,
-        metadata: {
-          name: metadata.name,
-          owner: metadata.owner,
-          issuer: metadata.issuer,
-          startAt: Number(metadata.startAt),
-          commitEndAt: Number(metadata.commitEndAt),
-          endAt: Number(metadata.endAt),
-          currentPhase: Number(metadata.phase),
-          finalized: metadata.finalized,
-          optionCount: Number(metadata.optionCount),
-          totalVotes: Number(metadata.totalVotes),
-        },
+        metadata: metadataSummary,
         optionLabels,
         optionCounts: optionCounts.map((value) => Number(value)),
         leading: {
@@ -385,6 +541,10 @@ export async function runSimulation(simulation, env) {
         endISO,
         startISO,
         votes: voteRecords,
+        telemetry: {
+          transactions: txTelemetry,
+        },
+        metrics,
       },
       null,
       2

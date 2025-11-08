@@ -1,4 +1,4 @@
-# Blockchain Voting API
+﻿# Blockchain Voting API
 
 Sistema de votacao totalmente on-chain construido em Solidity com Hardhat. A arquitetura combina privacidade (via commit-reveal e blind signatures) com um token de stake (ERC-721) transferivel que controla quem pode votar em cada pauta.
 
@@ -17,16 +17,16 @@ Sistema de votacao totalmente on-chain construido em Solidity com Hardhat. A arq
    - Os tokens podem ser transferidos livremente ate o commit; o novo dono assume o direito de votar naquela pauta.
 
 3. **Commit (on-chain)**
-   - Entre `startAt` e `commitEndAt`, o eleitor calcula `commitment = keccak256(credentialHash, optionIndex, salt, committer)` onde `committer` é o endereço do próprio remetente (`msg.sender`).
+   - Entre `startAt` e `commitEndAt`, o eleitor calcula `commitment = keccak256(credentialHash, optionIndex, salt, committer)` onde `committer` Ã© o endereÃ§o do prÃ³prio remetente (`msg.sender`).
    - Ele chama `commitVoteWithToken(tokenId, credentialHash, commitment, signature)` a partir da carteira do dono do token.
-   - O contrato verifica a assinatura da autoridade, confere que o chamador é o dono do token (sem operadores/aproved), vincula o compromisso ao remetente e armazena apenas o hash do voto.
+   - O contrato verifica a assinatura da autoridade, confere que o chamador Ã© o dono do token (sem operadores/aproved), vincula o compromisso ao remetente e armazena apenas o hash do voto.
 
 4. **Reveal (on-chain)**
    - Entre `commitEndAt` e `endAt`, o eleitor chama `revealVote(credentialHash, optionIndex, salt)`.
-   - O contrato recomputa o compromisso incluindo o endereço do remetente que efetuou o commit e valida antes de contar o voto.
+   - O contrato recomputa o compromisso incluindo o endereÃ§o do remetente que efetuou o commit e valida antes de contar o voto.
 
 5. **Finalizacao**
-   - Após `endAt`, qualquer conta pode chamar `finalize()` para emitir o evento `Finalized` com o resultado.
+   - ApÃ³s `endAt`, qualquer conta pode chamar `finalize()` para emitir o evento `Finalized` com o resultado.
 
 Metafora: a secretaria distribui fichas carimbadas de participacao (token de stake PoS). O eleitor escreve o voto em um papel cifrado e lacra no envelope (commit). Na hora certa, mostra seu papel e o carimbo para validar e contar (reveal). Se vender ou repassar a ficha antes do commit, transfere junto o direito de votar.
 
@@ -101,37 +101,55 @@ Acesse `http://localhost:8080/frontend/index.html`. A pagina carrega o JSON da s
 - status de cada pauta (janela de commit/reveal e vencedor).
 
 > Rode `npm run simulate` sempre que quiser gerar dados atualizados.
+### 4. Coleta de metricas automatizadas
+
+O runner grava, no mesmo JSON salvo em `cache/`, dois blocos novos:
+
+- `telemetry.transactions`: cada transacao do experimento com tipo (`deploy-voting`, `vote-commit`, etc.), conta envolvida, gas usado, custo estimado em ETH, timestamp do bloco e duracao em milissegundos.
+- `metrics`: agregados prontos para o TCC separados em `performance`, `security` e `usability`. Exemplos:
+  - `performance.gas.commit` resume gas/custos dos commits, enquanto `performance.timing` mostra a diferenca entre as janelas configuradas e os horarios observados.
+  - `security.credentialIntegrity`, `security.windowEnforcement` e `security.auditTrail` indicam duplicidades, violacoes de janela e se o snapshot foi registrado.
+  - `usability.transactionsPerVoter`, `usability.avgVoteFeeEth` e `usability.tokenProvisioning` medem o esforco e o custo medio por eleitor, alem da preparacao do stake.
+
+Rode `npm run simulate` (ou `npx hardhat run scripts/simulate.js --network ...`) para atualizar esses blocos. Exemplos rapidos via CLI:
+
+```bash
+jq '.metrics.performance.throughput' cache/simulate-*.json
+jq '.telemetry.transactions[] | select(.type == "vote-commit") | {label, gasUsed, feeEth}' cache/simulate-*.json
+```
+
+Assim voce consegue registrar evidencias numericas de desempenho, seguranca e usabilidade em cada experimento.
 
 ## Geração de simulações via LM Studio
 
-Com o LM Studio rodando localmente (endpoint padrão `http://127.0.0.1:1234/v1/chat/completions`), você pode pedir à LLM que crie cenários prontos para o `scripts/simulate.js`.
+Com o LM Studio rodando localmente (endpoint padrÃ£o `http://127.0.0.1:1234/v1/chat/completions`), vocÃª pode pedir Ã  LLM que crie cenÃ¡rios prontos para o `scripts/simulate.js`.
 
 - Arquivo exemplo (guia para a LLM): `scripts/simulations.example.json`
-- Arquivo gerado (saída): `scripts/simulations.generated.json`
+- Arquivo gerado (saÃ­da): `scripts/simulations.generated.json`
 
-O script `scripts/generate-simulations-llm.js` usa, por padrão, o exemplo acima para orientar a LLM e grava a saída no arquivo gerado:
+O script `scripts/generate-simulations-llm.js` usa, por padrÃ£o, o exemplo acima para orientar a LLM e grava a saÃ­da no arquivo gerado:
 
 ```bash
 node scripts/generate-simulations-llm.js --model "nome-do-modelo-no-lm-studio"
 ```
 
-Opções úteis:
-- `--count` (`-c`): quantidade de simulações desejadas (ex.: `--count 10`).
-- `--temperature`: ajusta a criatividade da resposta da LLM (padrão `0.4`).
-- `--endpoint`: URL do servidor caso não esteja em `127.0.0.1:1234`.
+OpÃ§Ãµes Ãºteis:
+- `--count` (`-c`): quantidade de simulaÃ§Ãµes desejadas (ex.: `--count 10`).
+- `--temperature`: ajusta a criatividade da resposta da LLM (padrÃ£o `0.4`).
+- `--endpoint`: URL do servidor caso nÃ£o esteja em `127.0.0.1:1234`.
 - `--model`: nome do modelo carregado no LM Studio.
-- `--out` (`-o`): caminho do arquivo de saída (padrão `scripts/simulations.generated.json`).
-- `--example`: caminho de um JSON exemplo para guiar a LLM (padrão `scripts/simulations.example.json`).
-- `--timeout`: timeout da requisição em ms (padrão `45000`).
-- `--help`: mostra todas as flags disponíveis.
+- `--out` (`-o`): caminho do arquivo de saÃ­da (padrÃ£o `scripts/simulations.generated.json`).
+- `--example`: caminho de um JSON exemplo para guiar a LLM (padrÃ£o `scripts/simulations.example.json`).
+- `--timeout`: timeout da requisiÃ§Ã£o em ms (padrÃ£o `45000`).
+- `--help`: mostra todas as flags disponÃ­veis.
 
-Exemplo para gerar 20 simulações variadas de assembleias condominiais:
+Exemplo para gerar 20 simulaÃ§Ãµes variadas de assembleias condominiais:
 
 ```bash
 node scripts/generate-simulations-llm.js --model "nome-do-modelo-no-lm-studio" --count 20
 ```
 
-Depois da geração, você pode rodar o simulador diretamente (ele já usa o arquivo gerado por padrão):
+Depois da geraÃ§Ã£o, vocÃª pode rodar o simulador diretamente (ele jÃ¡ usa o arquivo gerado por padrÃ£o):
 
 ```bash
 npx hardhat run scripts/simulate.js --network localhost
@@ -143,7 +161,7 @@ Se desejar apontar para outro arquivo, use `--config`:
 npx hardhat run scripts/simulate.js --network localhost --config caminho/para/arquivo.json
 ```
 
-Assim você pode validar os cenários sugeridos pela LLM e alimentar a interface ou outros testes automatizados.
+Assim vocÃª pode validar os cenÃ¡rios sugeridos pela LLM e alimentar a interface ou outros testes automatizados.
 
 ## Deploy manual (opcional)
 
@@ -171,7 +189,7 @@ O script realiza o deploy de `StakeToken` + `TokenizedVoting` na rede `localhost
 - `mint(address to)` e `batchMint(address[] to)`  
   Distribuem o token de stake PoS (NFT) para cada eleitor autorizado.
 - `tokensOfOwner(address)`  
-  Lista rapida dos tokenIds vinculados a um endereco — util no frontend para exibir a carteira.
+  Lista rapida dos tokenIds vinculados a um endereco â€” util no frontend para exibir a carteira.
 - `setBaseTokenURI(string)`  
   Ajusta o prefixo de metadados associado aos NFTs de stake.
 
@@ -194,3 +212,5 @@ Sim, mas o token marcado como usado nao permite novo commit naquela pauta. Trans
 
 **Como adapto para producao?**  
 Substitua a simulacao por processos reais: distribuicao segura dos tokens de stake, geracao de credenciais off-chain, clientes que saibam montar commitment/reveal nos prazos corretos e, se necessario, camadas extras de auditoria (ex: provas de inclusao/exclusao, integraches com sistemas externos).
+
+
