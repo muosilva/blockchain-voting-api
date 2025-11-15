@@ -5,6 +5,13 @@ import { prepareProviderReset } from "./lib/provider-utils.js";
 import { shouldReset } from "./lib/sim-helpers.js";
 import { runSimulation } from "./lib/runner.js";
 
+function cloneSimulation(simulation) {
+  if (typeof structuredClone === "function") {
+    return structuredClone(simulation);
+  }
+  return JSON.parse(JSON.stringify(simulation));
+}
+
 async function main() {
   const args = parseArgs(process.argv);
   const configPath = args.configPath ?? DEFAULT_CONFIG_PATH;
@@ -24,6 +31,10 @@ async function main() {
   const ids = normalizeScenarioIds(args.scenarioId);
   const simulations = selectSimulations(config.simulations, ids);
 
+  if ((args.contractAddress || args.stakeTokenAddress) && simulations.length !== 1) {
+    throw new Error("Use --contract/--stake apenas quando uma unica simulacao for selecionada.");
+  }
+
   const selectedNetwork = args.networkName ?? process.env.HARDHAT_NETWORK;
   const connection = await network.connect(selectedNetwork);
   const { ethers, provider, networkName } = connection;
@@ -31,7 +42,14 @@ async function main() {
   console.log(`Conectado a rede: ${effectiveNetwork}`);
 
   const summary = [];
-  for (const simulation of simulations) {
+  for (const rawSimulation of simulations) {
+    const simulation = cloneSimulation(rawSimulation);
+    if (args.contractAddress) {
+      simulation.contractAddress = args.contractAddress;
+    }
+    if (args.stakeTokenAddress) {
+      simulation.token = { ...(simulation.token ?? {}), address: args.stakeTokenAddress };
+    }
     let restoreState = null;
     if (shouldReset(config.defaults, simulation)) {
       const resetHandle = await prepareProviderReset(provider);
