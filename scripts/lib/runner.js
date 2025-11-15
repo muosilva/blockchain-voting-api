@@ -5,6 +5,61 @@ import { moveToTimestamp } from "./provider-utils.js";
 import { buildPlan, mergeTiming, slugify } from "./sim-helpers.js";
 import { computeMetrics } from "./metrics.js";
 
+function parsePrivateKeyList(rawValue) {
+  if (!rawValue) return [];
+  const trimmed = rawValue.trim();
+  if (!trimmed) return [];
+  let entries = [];
+  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        entries = parsed.map((value) => (typeof value === "string" ? value.trim() : ""));
+      }
+    } catch {
+      entries = [];
+    }
+  }
+  if (!entries.length) {
+    entries = trimmed
+      .split(/[,\n\r\t\s]+/)
+      .map((value) => value.trim())
+      .filter(Boolean);
+  }
+  return entries.filter((value) => value.startsWith("0x") && value.length > 10);
+}
+
+async function gatherSigners(ethers, provider) {
+  const baseSigners = await ethers.getSigners();
+  const knownAddresses = new Set();
+  for (const signer of baseSigners) {
+    const address = typeof signer.address === "string" ? signer.address : await signer.getAddress();
+    knownAddresses.add(address.toLowerCase());
+  }
+
+  const extraKeys = parsePrivateKeyList(process.env.SIMULATION_PRIVATE_KEYS ?? "");
+  if (!extraKeys.length) return baseSigners;
+
+  const connectedProvider = provider ?? ethers.provider;
+  const extras = [];
+  for (const privateKey of extraKeys) {
+    try {
+      const wallet = new ethers.Wallet(privateKey, connectedProvider);
+      if (knownAddresses.has(wallet.address.toLowerCase())) continue;
+      extras.push(wallet);
+      knownAddresses.add(wallet.address.toLowerCase());
+    } catch (error) {
+      console.warn(`Nao foi possivel carregar a chave privada para simulacao: ${error.message}`);
+    }
+  }
+
+  if (extras.length) {
+    console.log(`Carregando ${extras.length} carteiras extras da variavel SIMULATION_PRIVATE_KEYS.`);
+  }
+
+  return [...baseSigners, ...extras];
+}
+
 /**
  * Runs a single simulation scenario: deploys the contract, commits and reveals votes, writes a result file.
  *
@@ -46,7 +101,7 @@ export async function runSimulation(simulation, env) {
     return normalizeTimestamp(block);
   }
 
-  const signers = await ethers.getSigners();
+  const signers = await gatherSigners(ethers, provider);
   const signerInfos = await Promise.all(
     signers.map(async (signer, index) => ({
       index,

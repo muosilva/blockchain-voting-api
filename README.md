@@ -102,6 +102,8 @@ Acesse `http://localhost:8080/frontend/index.html`. A página carrega o JSON da 
 
 > Rode `npm run simulate` sempre que quiser gerar dados atualizados.
 
+> Para apontar a simulação para uma testnet pública defina a variável `SIMULATION_PRIVATE_KEYS` com as carteiras que participarão (formato JSON ou separado por vírgula) e utilize `npm run simulate:testnet`. Exemplo: `SIMULATION_PRIVATE_KEYS='["0xabc...","0xdef..."]' npm run simulate:testnet -- --scenario sim-5`. Todas as carteiras precisam estar pré-carregadas com BNB de teste para cobrir as taxas de gás.
+
 ### 4. Coleta de métricas automatizadas
 
 O runner grava, no mesmo JSON salvo em `cache/`, dois blocos novos:
@@ -162,6 +164,8 @@ Se desejar apontar para outro arquivo, use `--config`:
 npx hardhat run scripts/simulate.js --network localhost --config caminho/para/arquivo.json
 ```
 
+Para executar diretamente contra a Binance Smart Chain testnet utilize `--network binanceTestnet` (ou o script `npm run simulate:testnet`). Lembre-se de definir `SIMULATION_PRIVATE_KEYS` com todas as carteiras que farão commit/reveal para que o runner consiga assinar as transações.
+
 Assim você pode validar os cenários sugeridos pela LLM e alimentar a interface ou outros testes automatizados.
 
 ## Deploy manual (opcional)
@@ -213,4 +217,3 @@ Sim, mas o token marcado como usado não permite novo commit naquela pauta. Tran
 
 **Como adapto para produção?**  
 Substitua a simulação por processos reais: distribuição segura dos tokens de stake, geração de credenciais off-chain, clientes que saibam montar commitment/reveal nos prazos corretos e, se necessário, camadas extras de auditoria (ex.: provas de inclusão/exclusão, integrações com sistemas externos).
-

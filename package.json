@@ -9,7 +9,9 @@
     "build": "hardhat compile",
     "node": "hardhat node",
     "deploy:local": "hardhat run scripts/deploy.js --network localhost",
-    "simulate": "hardhat run scripts/simulate.js --network localhost"
+    "deploy:testnet": "hardhat run scripts/deploy.js --network binanceTestnet",
+    "simulate": "hardhat run scripts/simulate.js --network localhost",
+    "simulate:testnet": "hardhat run scripts/simulate.js --network binanceTestnet"
   },
   "repository": {
     "type": "git",
