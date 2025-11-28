@@ -20,6 +20,14 @@ export function parseArgs(argv) {
       args.networkName = argv[++i];
     } else if (value?.startsWith("--network=")) {
       args.networkName = value.split("=", 2)[1];
+    } else if (["--contract", "--voting", "--vote-contract"].includes(value)) {
+      args.contractAddress = argv[++i];
+    } else if (value?.startsWith("--contract=") || value?.startsWith("--voting=") || value?.startsWith("--vote-contract=")) {
+      args.contractAddress = value.split("=", 2)[1];
+    } else if (["--stake", "--stake-token"].includes(value)) {
+      args.stakeTokenAddress = argv[++i];
+    } else if (value?.startsWith("--stake=") || value?.startsWith("--stake-token=")) {
+      args.stakeTokenAddress = value.split("=", 2)[1];
     } else if (value === "--help" || value === "-h") {
       args.help = true;
     } else if (value) {
@@ -36,6 +44,7 @@ export function printHelp(defaultPath) {
   console.log("  --scenario,-s  Executa apenas a simulacao informada (aceita multiplos IDs separados por virgula).");
   console.log("  --list,   -l   Lista as simulacoes disponiveis no JSON e encerra.");
   console.log("  --network,-n  Forca o uso de uma rede definida no hardhat.config (ex.: localhost).");
+  console.log("  --contract     Reaproveita um contrato ja implantado (TokenizedVoting ou SimpleVoting).");
+  console.log("  --stake        Reaproveita um StakeToken ja implantado para simulacoes TokenizedVoting.");
   console.log("  --help,   -h   Exibe esta mensagem.");
 }
-

@@ -5,6 +5,61 @@ import { moveToTimestamp } from "./provider-utils.js";
 import { buildPlan, mergeTiming, slugify } from "./sim-helpers.js";
 import { computeMetrics } from "./metrics.js";
 
+function parsePrivateKeyList(rawValue) {
+  if (!rawValue) return [];
+  const trimmed = rawValue.trim();
+  if (!trimmed) return [];
+  let entries = [];
+  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        entries = parsed.map((value) => (typeof value === "string" ? value.trim() : ""));
+      }
+    } catch {
+      entries = [];
+    }
+  }
+  if (!entries.length) {
+    entries = trimmed
+      .split(/[,\n\r\t\s]+/)
+      .map((value) => value.trim())
+      .filter(Boolean);
+  }
+  return entries.filter((value) => value.startsWith("0x") && value.length > 10);
+}
+
+async function gatherSigners(ethers, provider) {
+  const baseSigners = await ethers.getSigners();
+  const knownAddresses = new Set();
+  for (const signer of baseSigners) {
+    const address = typeof signer.address === "string" ? signer.address : await signer.getAddress();
+    knownAddresses.add(address.toLowerCase());
+  }
+
+  const extraKeys = parsePrivateKeyList(process.env.SIMULATION_PRIVATE_KEYS ?? "");
+  if (!extraKeys.length) return baseSigners;
+
+  const connectedProvider = ethers.provider;
+  const extras = [];
+  for (const privateKey of extraKeys) {
+    try {
+      const wallet = new ethers.Wallet(privateKey, connectedProvider);
+      if (knownAddresses.has(wallet.address.toLowerCase())) continue;
+      extras.push(wallet);
+      knownAddresses.add(wallet.address.toLowerCase());
+    } catch (error) {
+      console.warn(`Nao foi possivel carregar a chave privada para simulacao: ${error.message}`);
+    }
+  }
+
+  if (extras.length) {
+    console.log(`Carregando ${extras.length} carteiras extras da variavel SIMULATION_PRIVATE_KEYS.`);
+  }
+
+  return [...baseSigners, ...extras];
+}
+
 /**
  * Runs a single simulation scenario: deploys the contract, commits and reveals votes, writes a result file.
  *
@@ -46,7 +101,7 @@ export async function runSimulation(simulation, env) {
     return normalizeTimestamp(block);
   }
 
-  const signers = await ethers.getSigners();
+  const signers = await gatherSigners(ethers, provider);
   const signerInfos = await Promise.all(
     signers.map(async (signer, index) => ({
       index,
@@ -85,27 +140,24 @@ export async function runSimulation(simulation, env) {
   const contractName = simulation.contractName ?? "SimpleVoting";
   const isTokenizedVoting = contractName === "TokenizedVoting";
 
-  const tokenConfig = simulation.token ?? null;
+  let tokenConfig = simulation.token ? { ...simulation.token } : null;
+  if (!tokenConfig && isTokenizedVoting) tokenConfig = {};
 
   const timing = mergeTiming(defaults.timing, simulation.timing);
   const latestBlock = await getBlockSafe("latest");
   const now = Number(latestBlock?.timestamp ?? Math.floor(Date.now() / 1000));
-  const mintOverhead = isTokenizedVoting && !tokenConfig?.address ? plan.length : 0;
-  const commitWindow = Math.max(timing.commitDuration ?? 0, plan.length + mintOverhead + 2);
-  const revealWindow = Math.max(timing.revealDuration ?? 0, plan.length + 2);
-  const startAt = now + timing.startDelay;
-  const commitEndAt = startAt + commitWindow;
-  const endAt = commitEndAt + revealWindow;
-
-  const startISO = new Date(startAt * 1000).toISOString();
-  const commitEndISO = new Date(commitEndAt * 1000).toISOString();
-  const endISO = new Date(endAt * 1000).toISOString();
+  let startAt = null;
+  let commitEndAt = null;
+  let endAt = null;
   let stakeToken = null;
   let stakeTokenAddress = null;
   const tokenMints = [];
   const tokenTransfers = [];
   const txTelemetry = [];
   let auditTelemetry = null;
+  const wantsExistingContract = typeof simulation.contractAddress === "string" && simulation.contractAddress.length > 0;
+  let contract = null;
+  let contractAddress = null;
 
   async function recordTransaction(type, txResponse, meta = {}) {
     if (!txResponse?.wait) return null;
@@ -196,12 +248,52 @@ export async function runSimulation(simulation, env) {
     return null;
   };
 
+  if (wantsExistingContract) {
+    try {
+      contractAddress = ethers.getAddress(simulation.contractAddress);
+    } catch (error) {
+      throw new Error(`Endereco de contrato invalido (${simulation.contractAddress}): ${error.message}`);
+    }
+    contract = await ethers.getContractAt(contractName, contractAddress);
+    console.log("Reutilizando contrato existente:", contractAddress);
+    let existingMetadata;
+    try {
+      existingMetadata = await contract.metadata();
+    } catch (error) {
+      throw new Error(`Contrato ${contractAddress} nao expõe metadata(): ${error.message}`);
+    }
+    startAt = Number(existingMetadata.startAt);
+    commitEndAt = Number(existingMetadata.commitEndAt);
+    endAt = Number(existingMetadata.endAt);
+    if (!Number.isFinite(startAt) || !Number.isFinite(commitEndAt) || !Number.isFinite(endAt)) {
+      throw new Error("Nao foi possivel obter o agendamento do contrato existente.");
+    }
+    if (isTokenizedVoting && typeof contract.stakeTokenAddress === "function") {
+      try {
+        const attachedStake = await contract.stakeTokenAddress();
+        if (attachedStake && attachedStake !== ethers.ZeroAddress) {
+          stakeTokenAddress = attachedStake;
+          if (tokenConfig) tokenConfig.address = tokenConfig.address ?? attachedStake;
+          else tokenConfig = { address: attachedStake };
+        }
+      } catch (error) {
+        console.warn("Aviso: nao foi possivel descobrir o StakeToken do contrato existente:", error.message || error);
+      }
+    }
+  }
+
   const wantsTokenSupport = !!tokenConfig || isTokenizedVoting;
 
   if (wantsTokenSupport) {
     if (tokenConfig?.address) {
-      stakeTokenAddress = tokenConfig.address;
+      try {
+        stakeTokenAddress = ethers.getAddress(tokenConfig.address);
+        tokenConfig.address = stakeTokenAddress;
+      } catch (error) {
+        throw new Error(`Endereco de StakeToken invalido (${tokenConfig.address}): ${error.message}`);
+      }
       stakeToken = await ethers.getContractAt("StakeToken", stakeTokenAddress);
+      console.log("StakeToken existente:", stakeTokenAddress);
     } else {
       const stakeFactory = await ethers.getContractFactory("StakeToken");
       const stakeName = tokenConfig?.name ?? "PoS Stake Token";
@@ -286,32 +378,66 @@ export async function runSimulation(simulation, env) {
     }
   }
 
+  if (!wantsExistingContract) {
+    const mintOverhead = isTokenizedVoting && !tokenConfig?.address ? plan.length : 0;
+    const commitWindow = Math.max(timing.commitDuration ?? 0, plan.length + mintOverhead + 2);
+    const revealWindow = Math.max(timing.revealDuration ?? 0, plan.length + 2);
+    startAt = now + timing.startDelay;
+    commitEndAt = startAt + commitWindow;
+    endAt = commitEndAt + revealWindow;
+  }
+
+  if (!Number.isFinite(startAt) || !Number.isFinite(commitEndAt) || !Number.isFinite(endAt)) {
+    throw new Error("Horarios invalidos para iniciar a simulacao. Verifique o contrato/configuracao.");
+  }
+
+  const startISO = new Date(startAt * 1000).toISOString();
+  const commitEndISO = new Date(commitEndAt * 1000).toISOString();
+  const endISO = new Date(endAt * 1000).toISOString();
+
   const usedTokenIdsByAddress = new Map();
 
-  let deployArgs = simulation.deployArgs;
-  if (!Array.isArray(deployArgs)) {
-    if (contractName === "TokenizedVoting") {
-      if (!stakeTokenAddress) {
-        throw new Error(
-          "TokenizedVoting requer um StakeToken. Defina simulation.token ou forneca token.address para usar um existente."
-        );
+  if (!wantsExistingContract) {
+    let deployArgs = simulation.deployArgs;
+    if (!Array.isArray(deployArgs)) {
+      if (contractName === "TokenizedVoting") {
+        if (!stakeTokenAddress) {
+          throw new Error(
+            "TokenizedVoting requer um StakeToken. Defina simulation.token ou forneca token.address para usar um existente."
+          );
+        }
+        deployArgs = [
+          simulation.name ?? label,
+          simulation.options,
+          startAt,
+          commitEndAt,
+          endAt,
+          issuerAddress,
+          stakeTokenAddress,
+        ];
+      } else {
+        deployArgs = [simulation.name ?? label, simulation.options, startAt, commitEndAt, endAt, issuerAddress];
       }
-      deployArgs = [simulation.name ?? label, simulation.options, startAt, commitEndAt, endAt, issuerAddress, stakeTokenAddress];
-    } else {
-      deployArgs = [simulation.name ?? label, simulation.options, startAt, commitEndAt, endAt, issuerAddress];
     }
+
+    const factory = await ethers.getContractFactory(contractName);
+    contract = await factory.connect(issuer).deploy(...deployArgs);
+    await contract.waitForDeployment();
+    const contractDeployTx = contract.deploymentTransaction();
+    if (contractDeployTx) {
+      await recordTransaction("deploy-voting", contractDeployTx, { actor: issuerAddress, context: label });
+    }
+    contractAddress = await contract.getAddress();
+    console.log("Deploy:", contractAddress);
   }
 
-  const factory = await ethers.getContractFactory(contractName);
-  const contract = await factory.connect(issuer).deploy(...deployArgs);
-  await contract.waitForDeployment();
-  const contractDeployTx = contract.deploymentTransaction();
-  if (contractDeployTx) {
-    await recordTransaction("deploy-voting", contractDeployTx, { actor: issuerAddress, context: label });
+  if (!contract) {
+    contract = await ethers.getContractAt(contractName, contractAddress);
   }
-  const contractAddress = await contract.getAddress();
-
-  console.log("Deploy:", contractAddress);
+  if (!contractAddress) {
+    contractAddress = await contract.getAddress();
+  }
+  console.log("Contrato ativo:", contractAddress);
   console.log("Issuer (credential authority):", issuerAddress);
 
   const voteRecords = [];
@@ -339,7 +465,7 @@ export async function runSimulation(simulation, env) {
       }
       const usedSet = usedTokenIdsByAddress.get(voterAddress) ?? new Set();
 
-      while (!tokenConfig?.address && owned.length <= usedSet.size) {
+      while (owned.length <= usedSet.size) {
         const mintTx = await stakeToken.connect(issuer).mint(voterAddress);
         const mintRecord = await recordTransaction("stake-mint", mintTx, {
           actor: issuerAddress,
