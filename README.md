@@ -3,7 +3,6 @@
 Sistema de votação totalmente on-chain construído em Solidity com Hardhat. A arquitetura combina privacidade (via commit-reveal e blind signatures) com um token de stake (ERC-721) transferível que define quem pode votar em cada pauta.
 
 - **Commit-Reveal**: primeiro o eleitor registra um compromisso criptográfico; na janela de revelação ele abre o voto junto com o segredo (salt) que prova a autoria. Nenhum voto pode ser lido antes do prazo e cópias são descartadas.
-- **Blind Signatures**: a autoridade emite credenciais assinadas sem enxergar o conteúdo final. Assim apenas eleitores autorizados participam, mas a identidade permanece desvinculada da transação on-chain.
 - **Token de Stake (ERC-721)**: um contrato independente (`StakeToken.sol`) cunha NFTs que representam o poder de voto. O contrato de pauta (`TokenizedVoting.sol`) apenas referencia esse token externo. Quem detém o NFT pode chamar `commitVoteWithToken`; transferir o token antes do commit move o direito de voto para outro usuário.
 
 ## Visão Geral do Fluxo
