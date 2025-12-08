@@ -162,6 +162,8 @@ Se desejar apontar para outro arquivo, use `--config`:
 npx hardhat run scripts/simulate.js --network localhost --config caminho/para/arquivo.json
 ```
 
+Para executar diretamente contra a Binance Smart Chain testnet utilize `--network binanceTestnet` (ou o script `npm run simulate:testnet`). Lembre-se de definir `SIMULATION_PRIVATE_KEYS` com todas as carteiras que farão commit/reveal para que o runner consiga assinar as transações. Você também pode apontar o script para contratos já existentes usando `--contract 0x...` e `--stake 0x...` quando quiser registrar commits em endereços previamente implantados.
+
 Assim você pode validar os cenários sugeridos pela LLM e alimentar a interface ou outros testes automatizados.
 
 ## Deploy manual (opcional)
