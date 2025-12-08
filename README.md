@@ -1,8 +1,9 @@
 # Blockchain Voting API
 
-Sistema de votação totalmente on-chain construído em Solidity com Hardhat. A arquitetura combina privacidade (via commit-reveal e blind signatures) com um token de stake (ERC-721) transferível que define quem pode votar em cada pauta.
+Sistema de votação totalmente on-chain construído em Solidity com Hardhat. A arquitetura combina privacidade (via commit-reveal) com um token de stake (ERC-721) transferível que define quem pode votar em cada pauta.
 
 - **Commit-Reveal**: primeiro o eleitor registra um compromisso criptográfico; na janela de revelação ele abre o voto junto com o segredo (salt) que prova a autoria. Nenhum voto pode ser lido antes do prazo e cópias são descartadas.
+- **Blind Signatures**: a autoridade emite credenciais assinadas sem enxergar o conteúdo final. Assim apenas eleitores autorizados participam, mas a identidade permanece desvinculada da transação on-chain.
 - **Token de Stake (ERC-721)**: um contrato independente (`StakeToken.sol`) cunha NFTs que representam o poder de voto. O contrato de pauta (`TokenizedVoting.sol`) apenas referencia esse token externo. Quem detém o NFT pode chamar `commitVoteWithToken`; transferir o token antes do commit move o direito de voto para outro usuário.
 
 ## Visão Geral do Fluxo
@@ -100,24 +101,6 @@ Acesse `http://localhost:8080/frontend/index.html`. A página carrega o JSON da 
 - status de cada pauta (janela de commit/reveal e vencedor).
 
 > Rode `npm run simulate` sempre que quiser gerar dados atualizados.
-
-> Para apontar a simulação para uma testnet pública defina a variável `SIMULATION_PRIVATE_KEYS` com as carteiras que participarão (formato JSON ou separado por vírgula) e utilize `npm run simulate:testnet`. Exemplo: `SIMULATION_PRIVATE_KEYS='["0xabc...","0xdef..."]' npm run simulate:testnet -- --scenario sim-5`. Todas as carteiras precisam estar pré-carregadas com BNB de teste para cobrir as taxas de gás.
-
-#### Execução na BSC Testnet
-
-1. Preencha `.env` com `BSC_TESTNET_RPC_URL` e a chave privada que fará o papel de emissor (já usado pelo `scripts/deploy.js`).
-2. Exporte `SIMULATION_PRIVATE_KEYS` contendo **todas** as carteiras presentes no cenário (issuer + eleitores). O runner instancia carteiras extras a partir dessa lista para poder assinar `mint`, `commit`, `reveal` e `finalize` diretamente na BSC.
-3. Execute `npm run simulate:testnet -- --scenario sim-5` para reimplantar os contratos e acompanhar os commits ao vivo na rede pública. O script respeita os horários reais (sem time-travel), portanto aguarde as janelas configuradas.
-4. Se quiser **reaproveitar contratos já implantados**, passe `--contract 0x...` e, se aplicável, `--stake 0x...`. Exemplo:
-
-```bash
-SIMULATION_PRIVATE_KEYS='["0xISSUER...","0xELEITOR1...","0xELEITOR2..."]' \
-  npm run simulate:testnet -- --scenario sim-5 \
-  --contract 0x5E9D814A0456bB14cCc129DbF7bA224f0b3E2613 \
-  --stake 0x37C881BFcD5aA82881f0b0EA103AC9291E4020d0
-```
-
-Os commits/reveals/finalize emitidos por esse comando aparecem no [BscScan Testnet](https://testnet.bscscan.com/) com os eventos `StakeTokenUsed`, `Committed`, `Voted` e `Finalized`, provando que o fluxo rodou na rede pública.
 
 ### 4. Coleta de métricas automatizadas
 
@@ -232,3 +215,4 @@ Sim, mas o token marcado como usado não permite novo commit naquela pauta. Tran
 
 **Como adapto para produção?**  
 Substitua a simulação por processos reais: distribuição segura dos tokens de stake, geração de credenciais off-chain, clientes que saibam montar commitment/reveal nos prazos corretos e, se necessário, camadas extras de auditoria (ex.: provas de inclusão/exclusão, integrações com sistemas externos).
+

@@ -5,61 +5,6 @@ import { moveToTimestamp } from "./provider-utils.js";
 import { buildPlan, mergeTiming, slugify } from "./sim-helpers.js";
 import { computeMetrics } from "./metrics.js";
 
-function parsePrivateKeyList(rawValue) {
-  if (!rawValue) return [];
-  const trimmed = rawValue.trim();
-  if (!trimmed) return [];
-  let entries = [];
-  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
-    try {
-      const parsed = JSON.parse(trimmed);
-      if (Array.isArray(parsed)) {
-        entries = parsed.map((value) => (typeof value === "string" ? value.trim() : ""));
-      }
-    } catch {
-      entries = [];
-    }
-  }
-  if (!entries.length) {
-    entries = trimmed
-      .split(/[,\n\r\t\s]+/)
-      .map((value) => value.trim())
-      .filter(Boolean);
-  }
-  return entries.filter((value) => value.startsWith("0x") && value.length > 10);
-}
-
-async function gatherSigners(ethers, provider) {
-  const baseSigners = await ethers.getSigners();
-  const knownAddresses = new Set();
-  for (const signer of baseSigners) {
-    const address = typeof signer.address === "string" ? signer.address : await signer.getAddress();
-    knownAddresses.add(address.toLowerCase());
-  }
-
-  const extraKeys = parsePrivateKeyList(process.env.SIMULATION_PRIVATE_KEYS ?? "");
-  if (!extraKeys.length) return baseSigners;
-
-  const connectedProvider = ethers.provider;
-  const extras = [];
-  for (const privateKey of extraKeys) {
-    try {
-      const wallet = new ethers.Wallet(privateKey, connectedProvider);
-      if (knownAddresses.has(wallet.address.toLowerCase())) continue;
-      extras.push(wallet);
-      knownAddresses.add(wallet.address.toLowerCase());
-    } catch (error) {
-      console.warn(`Nao foi possivel carregar a chave privada para simulacao: ${error.message}`);
-    }
-  }
-
-  if (extras.length) {
-    console.log(`Carregando ${extras.length} carteiras extras da variavel SIMULATION_PRIVATE_KEYS.`);
-  }
-
-  return [...baseSigners, ...extras];
-}
-
 /**
  * Runs a single simulation scenario: deploys the contract, commits and reveals votes, writes a result file.
  *
@@ -101,7 +46,7 @@ export async function runSimulation(simulation, env) {
     return normalizeTimestamp(block);
   }
 
-  const signers = await gatherSigners(ethers, provider);
+  const signers = await ethers.getSigners();
   const signerInfos = await Promise.all(
     signers.map(async (signer, index) => ({
       index,
@@ -155,9 +100,6 @@ export async function runSimulation(simulation, env) {
   const tokenTransfers = [];
   const txTelemetry = [];
   let auditTelemetry = null;
-  const wantsExistingContract = typeof simulation.contractAddress === "string" && simulation.contractAddress.length > 0;
-  let contract = null;
-  let contractAddress = null;
 
   async function recordTransaction(type, txResponse, meta = {}) {
     if (!txResponse?.wait) return null;
@@ -420,16 +362,14 @@ export async function runSimulation(simulation, env) {
       }
     }
 
-    const factory = await ethers.getContractFactory(contractName);
-    contract = await factory.connect(issuer).deploy(...deployArgs);
-    await contract.waitForDeployment();
-    const contractDeployTx = contract.deploymentTransaction();
-    if (contractDeployTx) {
-      await recordTransaction("deploy-voting", contractDeployTx, { actor: issuerAddress, context: label });
-    }
-    contractAddress = await contract.getAddress();
-    console.log("Deploy:", contractAddress);
+  const factory = await ethers.getContractFactory(contractName);
+  const contract = await factory.connect(issuer).deploy(...deployArgs);
+  await contract.waitForDeployment();
+  const contractDeployTx = contract.deploymentTransaction();
+  if (contractDeployTx) {
+    await recordTransaction("deploy-voting", contractDeployTx, { actor: issuerAddress, context: label });
   }
+  const contractAddress = await contract.getAddress();
 
   if (!contract) {
     contract = await ethers.getContractAt(contractName, contractAddress);
