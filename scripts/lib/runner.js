@@ -100,6 +100,9 @@ export async function runSimulation(simulation, env) {
   const tokenTransfers = [];
   const txTelemetry = [];
   let auditTelemetry = null;
+  const wantsExistingContract = typeof simulation.contractAddress === "string" && simulation.contractAddress.length > 0;
+  let contract = null;
+  let contractAddress = null;
 
   async function recordTransaction(type, txResponse, meta = {}) {
     if (!txResponse?.wait) return null;
@@ -362,14 +365,16 @@ export async function runSimulation(simulation, env) {
       }
     }
 
-  const factory = await ethers.getContractFactory(contractName);
-  const contract = await factory.connect(issuer).deploy(...deployArgs);
-  await contract.waitForDeployment();
-  const contractDeployTx = contract.deploymentTransaction();
-  if (contractDeployTx) {
-    await recordTransaction("deploy-voting", contractDeployTx, { actor: issuerAddress, context: label });
+    const factory = await ethers.getContractFactory(contractName);
+    contract = await factory.connect(issuer).deploy(...deployArgs);
+    await contract.waitForDeployment();
+    const contractDeployTx = contract.deploymentTransaction();
+    if (contractDeployTx) {
+      await recordTransaction("deploy-voting", contractDeployTx, { actor: issuerAddress, context: label });
+    }
+    contractAddress = await contract.getAddress();
+    console.log("Deploy:", contractAddress);
   }
-  const contractAddress = await contract.getAddress();
 
   if (!contract) {
     contract = await ethers.getContractAt(contractName, contractAddress);
@@ -519,6 +524,21 @@ export async function runSimulation(simulation, env) {
     voteRecords.push(record);
 
     console.log(`Reveal credential ${entry.credentialHash} (conta ${revealAddress})`);
+  }
+
+  // Move past the reveal window to allow finalization
+  await moveToTimestamp(provider, endAt + 1, { phase: "ended", label });
+
+  // Call finalize to mark the election as complete
+  try {
+    const finalizeTx = await contract.connect(issuer).finalize();
+    await recordTransaction("finalize", finalizeTx, {
+      actor: issuerAddress,
+      context: label,
+    });
+    console.log("Votacao finalizada.");
+  } catch (error) {
+    console.warn("Aviso: nao foi possivel finalizar a votacao:", error.message);
   }
 
   const metadata = await contract.metadata();
